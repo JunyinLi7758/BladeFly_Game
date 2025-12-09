@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>试试飞我的太极！</title>
+    <title>试试飞我的太极！v1.4</title>
     <style>
         * {
             margin: 0;
@@ -73,7 +73,7 @@
     <div class="container">
         <canvas id="gameCanvas"></canvas>
         <div class="info">
-            点击屏幕开始 | 长按退出
+            点击屏幕开始 | By 纵月-李凌安 （希望大家玩的开心~ ）
         </div>
     </div>
 
@@ -214,7 +214,7 @@
         let barFraction = 0.0;
         let bladeflyCD = BLADEFLY_CD;
         let bladeflycdEndTime = null;
-        let message = "有本事飞我看看？~ 点击屏幕开始测试。";
+        let message = "有本事飞我看看？~ 点击屏幕开始";
         let selfbreak = 0;
 
         // 图标数据（响应式）
@@ -277,7 +277,7 @@
 
             if (bladeflycdEndTime !== null && now < bladeflycdEndTime) {
                 // 技能在CD中
-                message = `剑飞还在冷却中，剩余 ${(bladeflycdEndTime - now).toFixed(1)} 秒。`;
+                message = `别急，剑飞还在cd，剩余 ${(bladeflycdEndTime - now).toFixed(1)} 秒。`;
                 return;
             }
 
@@ -309,7 +309,7 @@
                 reactionTime = now - signalTime;
                 state = "RESULT";
                 bladeflycdEndTime = now + bladeflyCD;
-                message = "好断，哥们儿好断! 再来！";
+                message = "好断，哥们儿好断! 点屏幕再来！";
                 // stopSound(currentSkillSource);  // 停止前一个 skill 音效
                 currentSkillSource = playSound('skill');  // 播放技能释放音效
             } else if (state === "SAFE RUNNING") {
@@ -371,17 +371,18 @@
                 if (frac >= 1.0) {
                     frac = 1.0;
                     if (reactionTime === null) {
+                        if (state !== "SAFE RUNNING") {
+                            message = "这都飞不到？菜，就多练 \(^o^)/~ 再来？";
+                        } else {
+                            message = "自断就上钩？菜，就多练 \(^o^)/~ 再来？";
+                        }
                         // 读条完成（超时）
                         stopSound(currentBarSource);  // 停止读条音效
                         currentBarSource = null;
                         playSound('finish');  // 播放完成音效
                         state = "RESULT";
                         reactionTime = null;
-                        if (state !== "SAFE RUNNING") {
-                            message = "这都飞不到？菜，就多练 \(^o^)/~ 再来？";
-                        } else {
-                            message = "自断就上钩？菜，就多练 \(^o^)/~ 再来？";
-                        }
+
                     }
                 }
 
@@ -534,7 +535,7 @@
             ctx.font = `bold ${titleSize}px "Microsoft YaHei", Arial`;
             ctx.fillStyle = '#ffffff';
             ctx.textAlign = 'center';
-            ctx.fillText('试试飞我的太极！', WIDTH / 2, HEIGHT * 0.25);
+            ctx.fillText('剑飞生太极模拟器v1.4', WIDTH / 2, HEIGHT * 0.25);
 
             // 绘制消息
             const msgSize = Math.max(16, WIDTH * 0.04);
@@ -590,7 +591,6 @@
     </script>
 </body>
 </html>
-
 
 
 
