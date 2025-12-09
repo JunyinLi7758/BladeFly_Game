@@ -77,130 +77,57 @@
         </div>
     </div>
 
-    <!-- 音效文件用 audio 标签预加载 -->
-    <audio id="audio-bar" preload="auto" crossOrigin="anonymous">
-        <source src="sound/bar.MP3" type="audio/mpeg">
-    </audio>
-    <audio id="audio-skill" preload="auto" crossOrigin="anonymous">
-        <source src="sound/skill.MP3" type="audio/mpeg">
-    </audio>
-    <audio id="audio-finish" preload="auto" crossOrigin="anonymous">
-        <source src="sound/finish.MP3" type="audio/mpeg">
-    </audio>
-
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // ===== Web Audio API 音效管理 =====
+        // ===== Web Audio API 缓冲播放（无延迟） =====
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const soundBuffers = {};
         let isAudioReady = false;
 
-        // 从 audio 元素加载音效
-        function loadAudioFromElement(name, elementId) {
-            const audioElement = document.getElementById(elementId);
-            if (!audioElement) {
-                console.warn(`✗ 找不到 audio 元素: ${elementId}`);
-                return Promise.reject(new Error(`Audio element not found: ${elementId}`));
+        // 加载并解码音频文件到 buffer
+        async function loadAudioBuffer(name, filePath) {
+            try {
+                const response = await fetch(filePath);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                soundBuffers[name] = audioBuffer;
+                console.log(`✓ 音效 ${name} 加载完成`);
+                return audioBuffer;
+            } catch (e) {
+                console.error(`✗ 音效 ${name} 加载失败:`, e);
+                return null;
             }
-
-            return new Promise((resolve, reject) => {
-                audioElement.addEventListener('canplaythrough', () => {
-                    try {
-                        const source = audioContext.createMediaElementSource(audioElement);
-                        console.log(`✓ 音效 ${name} 从 audio 元素加载成功`);
-                        
-                        // 同时也尝试解码为 buffer（用于循环播放）
-                        const request = new XMLHttpRequest();
-                        request.open('GET', audioElement.src, true);
-                        request.responseType = 'arraybuffer';
-                        request.onload = () => {
-                            audioContext.decodeAudioData(request.response, (buffer) => {
-                                soundBuffers[name] = { buffer, audioElement, source };
-                                console.log(`✓ 音效 ${name} 已解码为 buffer`);
-                                resolve(buffer);
-                            }, (err) => {
-                                console.warn(`⚠ 音效 ${name} 解码失败，使用 audio 元素播放`, err);
-                                soundBuffers[name] = { buffer: null, audioElement, source };
-                                resolve(null);
-                            });
-                        };
-                        request.onerror = () => {
-                            console.warn(`⚠ 无法读取音效 ${name} 的 buffer`);
-                            soundBuffers[name] = { buffer: null, audioElement, source };
-                            resolve(null);
-                        };
-                        request.send();
-                    } catch (e) {
-                        console.warn(`⚠ 音效 ${name} 处理失败:`, e);
-                        resolve(null);
-                    }
-                }, { once: true });
-
-                audioElement.addEventListener('error', (e) => {
-                    console.warn(`✗ 音效 ${name} 加载失败:`, e);
-                    reject(e);
-                }, { once: true });
-
-                // 触发加载
-                audioElement.load();
-            });
         }
 
         function playSound(name, loop = false) {
-            const soundData = soundBuffers[name];
-            if (!soundData) {
+            const buffer = soundBuffers[name];
+            if (!buffer) {
                 console.warn(`✗ 音效 ${name} 未加载，无法播放`);
                 return null;
             }
 
-            // 优先用 buffer 播放（更低延迟）
-            if (soundData.buffer) {
-                try {
-                    const source = audioContext.createBufferSource();
-                    source.buffer = soundData.buffer;
-                    source.loop = loop;
-                    source.connect(audioContext.destination);
-                    source.start(0);
-                    console.log(`▶ 播放音效: ${name} (loop=${loop}) [buffer方式]`);
-                    return source;
-                } catch (e) {
-                    console.warn(`⚠ Buffer 播放失败，尝试 audio 元素:`, e);
-                }
+            try {
+                const source = audioContext.createBufferSource();
+                source.buffer = buffer;
+                source.loop = loop;
+                source.connect(audioContext.destination);
+                source.start(0);
+                console.log(`▶ 播放音效: ${name} (loop=${loop})`);
+                return source;
+            } catch (e) {
+                console.error(`✗ 播放音效 ${name} 失败:`, e);
+                return null;
             }
-
-            // 备用：用 audio 元素播放
-            if (soundData.audioElement) {
-                try {
-                    soundData.audioElement.currentTime = 0;
-                    soundData.audioElement.loop = loop;
-                    soundData.audioElement.play();
-                    console.log(`▶ 播放音效: ${name} (loop=${loop}) [audio元素方式]`);
-                    return soundData.audioElement;
-                } catch (e) {
-                    console.error(`✗ Audio 元素播放失败:`, e);
-                }
-            }
-
-            return null;
         }
 
         function stopSound(source) {
             if (!source) return;
             
             try {
-                // 如果是 BufferSource
-                if (source.stop) {
-                    source.stop();
-                    console.log('⏹ 停止 BufferSource');
-                }
-                // 如果是 audio 元素
-                else if (source.pause) {
-                    source.pause();
-                    source.currentTime = 0;
-                    console.log('⏹ 停止 audio 元素');
-                }
+                source.stop(0);
+                console.log('⏹ 停止音效');
             } catch (e) {
                 // 忽略已停止的源
             }
@@ -208,19 +135,19 @@
 
         // 预加载所有音效
         Promise.all([
-            loadAudioFromElement('bar', 'audio-bar'),
-            loadAudioFromElement('skill', 'audio-skill'),
-            loadAudioFromElement('finish', 'audio-finish')
+            loadAudioBuffer('bar', 'sound/bar.MP3'),
+            loadAudioBuffer('skill', 'sound/skill.MP3'),
+            loadAudioBuffer('finish', 'sound/finish.MP3')
         ]).then(() => {
             isAudioReady = true;
-            console.log('✓ 所有音效加载完成，Web Audio 准备就绪');
+            console.log('✓ 所有音效加载完成');
         }).catch(err => {
-            console.warn('⚠ 某些音效加载失败，将使用备用方案', err);
-            isAudioReady = true;
+            console.warn('⚠ 某些音效加载失败', err);
         });
 
-        // 保存当前播放的读条音效源，以便后续停止
+        // 保存当前播放的音效源，以便后续停止
         let currentBarSource = null;
+        let currentSkillSource = null;
 
         // 图片资源 - 使用新的 Image 对象确保正确加载
         let iconLoaded = false;
@@ -299,15 +226,6 @@
         let touchStartTime = 0;
         const LONG_PRESS_TIME = 1000; // 1秒为长按
 
-        // 激活 AudioContext（部分浏览器需要用户交互）
-        function activateAudio() {
-            if (audioContext.state === 'suspended') {
-                audioContext.resume().then(() => {
-                    console.log('✓ AudioContext 已激活');
-                });
-            }
-        }
-
         // 输入处理
         let keyPressed = {};
         
@@ -322,7 +240,6 @@
 
             if (e.key === ' ' || e.key === 'Enter') {
                 e.preventDefault();
-                activateAudio();  // 激活 AudioContext
                 handleSpaceKey();
             }
         });
@@ -339,7 +256,6 @@
 
         canvas.addEventListener('touchend', (e) => {
             e.preventDefault();
-            activateAudio();  // 激活 AudioContext
             const touchDuration = Date.now() - touchStartTime;
             
             if (touchDuration > LONG_PRESS_TIME) {
@@ -353,7 +269,6 @@
 
         // 鼠标点击（用于桌面端）
         canvas.addEventListener('click', () => {
-            activateAudio();  // 激活 AudioContext
             handleSpaceKey();
         });
 
@@ -381,7 +296,8 @@
                 // 抢跑
                 state = "TOO_EARLY";
                 bladeflycdEndTime = now + bladeflyCD;
-                playSound('skill');  // 打断失败也播放音效
+                // stopSound(currentSkillSource);  // 停止前一个 skill 音效
+                currentSkillSource = playSound('skill');  // 打断失败也播放音效
                 message = "飞空了！菜，就多练！ 骗到了！";
                 const delay = 0.4;
                 waitUntil = now + delay;
@@ -394,7 +310,8 @@
                 state = "RESULT";
                 bladeflycdEndTime = now + bladeflyCD;
                 message = "好断，哥们儿好断 按 空格 / 回车 再测一次。";
-                playSound('skill');  // 播放技能释放音效
+                // stopSound(currentSkillSource);  // 停止前一个 skill 音效
+                currentSkillSource = playSound('skill');  // 播放技能释放音效
             } else if (state === "SAFE RUNNING") {
                 // 安全进行中，什么都不做或跳过
             }
@@ -438,7 +355,8 @@
                     // 打断失败（敌人自断）
                     stopSound(currentBarSource);  // 停止读条音效
                     currentBarSource = null;
-                    playSound('skill');  // 播放打断失败音效
+                    // stopSound(currentSkillSource);  // 停止前一个 skill 音效
+                    // currentSkillSource = playSound('skill');  // 播放打断失败音效
                     state = "PREPARE";
                     barFraction = 0.0;
                     reactionTime = null;
@@ -672,7 +590,6 @@
     </script>
 </body>
 </html>
-
 
 
 
