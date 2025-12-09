@@ -111,7 +111,7 @@
             return new Promise((resolve, reject) => {
                 audioElement.addEventListener('canplaythrough', () => {
                     try {
-                        const source = audioContext.createMediaElementAudioSource(audioElement);
+                        const source = audioContext.createMediaElementSource(audioElement);
                         console.log(`✓ 音效 ${name} 从 audio 元素加载成功`);
                         
                         // 同时也尝试解码为 buffer（用于循环播放）
@@ -675,3 +675,4 @@
     </script>
 </body>
 </html>
+
