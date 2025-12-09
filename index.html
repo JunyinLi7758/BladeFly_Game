@@ -309,7 +309,7 @@
                 reactionTime = now - signalTime;
                 state = "RESULT";
                 bladeflycdEndTime = now + bladeflyCD;
-                message = "好断，哥们儿好断 按 空格 / 回车 再测一次。";
+                message = "好断，哥们儿好断! 再来！";
                 // stopSound(currentSkillSource);  // 停止前一个 skill 音效
                 currentSkillSource = playSound('skill');  // 播放技能释放音效
             } else if (state === "SAFE RUNNING") {
@@ -378,9 +378,9 @@
                         state = "RESULT";
                         reactionTime = null;
                         if (state !== "SAFE RUNNING") {
-                            message = "骗到你了！菜，就多练 \\(^o^)/~ 按 空格 / 回车 再测一次。";
+                            message = "自断就骗到你了！菜，就多练 \\(^o^)/~ 再来？";
                         } else {
-                            message = "菜，就多练 \\(^o^)/~ 按 空格 / 回车 再测一次。";
+                            message = "菜，就多练 \\(^o^)/~ 再来？";
                         }
                     }
                 }
@@ -590,6 +590,7 @@
     </script>
 </body>
 </html>
+
 
 
 
