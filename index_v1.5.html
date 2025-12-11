@@ -12,7 +12,7 @@
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>试试飞我的太极！v1.6</title>
+    <title>试试飞我的太极！v1.5</title>
     <style>
         * {
             margin: 0;
@@ -109,33 +109,6 @@
             overflow: auto;
             box-shadow: 0 8px 30px rgba(0,0,0,0.6);
         }
-        .job-select {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            z-index: 20;
-            display: flex;
-            gap: 6px;
-            background: rgba(0,0,0,0.5);
-            padding: 6px 8px;
-            border-radius: 8px;
-        }
-
-        .job-btn {
-            border: none;
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 12px;
-            cursor: pointer;
-            background: #444;
-            color: #fff;
-        }
-
-        .job-btn.active {
-            background: #00b45a;
-            color: #fff;
-        }
-
 
         .overlay h3 { margin-bottom: 8px; }
         .leaderboard-list { margin-top: 8px; }
@@ -156,13 +129,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- 新增：职业选择 -->
-        <div class="job-select">
-            <button class="job-btn" data-job="Blade">剑纯</button>
-            <button class="job-btn" data-job="Flower">万花</button>
-            <button class="job-btn" data-job="Toxic">五毒</button>
-        </div>
-
         <canvas id="gameCanvas"></canvas>
         <button id="leaderboardBtn">排行榜(捣鼓中)</button>
 
@@ -188,40 +154,14 @@
             </div>
         </div>
         <div class="info">
-            点击屏幕开始 | By 纵月-李凌安 （希望大家玩的开心~ ） 有BUG请及时反馈QQ:670191833
+            点击屏幕开始 | By 纵月-李凌安 （希望大家玩的开心~ ）
         </div>
     </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        // ===== 职业配置 =====
-        // 每个职业可以指定：图标、条读音效、技能音效、结束音效、CD
-        const JOBS = {
-            Blade: {
-                name: '剑纯',
-                skillname:'剑飞惊天',
-                icon: 'icon_blade.png',        // 你自己放对应图片
-                skillSound: 'skill_blade',
-            },
-            Flower: {
-                name: '万花',
-                skillname:'厥阴指',
-                icon: 'icon_flower.png',
-                skillSound: 'skill_flower',
-            },
-            Toxic: {
-                name: '五毒',
-                skillname:'灵蛊',
-                icon: 'icon_toxic.png',
-                skillSound: 'skill_toxic',
-            }
-        };
-
-        // 当前职业
-        let currentJobKey = 'Blade';
-        let currentJob = JOBS[currentJobKey];
-
+        
         /* ========== 音效系统 ========== */
 
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -240,23 +180,6 @@
                 return null;
             }
         }
-        function playBarLoop() {
-            stopSound(currentBarSource);
-            if (!currentJob.barSound) return;
-            currentBarSource = playSound(currentJob.barSound, true);
-        }
-
-        function playSkillOnce() {
-            if (!currentJob.skillSound) return;
-            stopSound(currentSkillSource);
-            currentSkillSource = playSound(currentJob.skillSound, false);
-        }
-
-        function playFinishOnce() {
-            if (!currentJob.finishSound) return;
-            playSound(currentJob.finishSound, false);
-        }
-
 
         function playSound(name, loop = false) {
             const buffer = soundBuffers[name];
@@ -285,17 +208,9 @@
         Promise.all([
             loadAudioBuffer('bar', 'sound/bar.MP3'),
             loadAudioBuffer('skill', 'sound/skill.MP3'),
-            loadAudioBuffer('finish', 'sound/finish.MP3'),
-            
-            loadAudioBuffer('skill_blade', 'sound/skill_blade.MP3'),
-            loadAudioBuffer('skill_flower', 'sound/skill_flower.MP3'),
-            loadAudioBuffer('skill_toxic', 'sound/skill_toxic.MP3'),
-
+            loadAudioBuffer('finish', 'sound/finish.MP3')
         ]).then(() => {
             isAudioReady = true;
-            console.log('✓ 所有音效加载完成');
-        }).catch(err => {
-            console.warn('⚠ 某些音效加载失败', err);
         });
 
         let currentBarSource = null;
@@ -305,31 +220,12 @@
 
         let iconLoaded = false;
         let logoLoaded = false;
-        // let iconImg = new Image();
+        let iconImg = new Image();
         let logoImg = new Image();
 
-        // iconImg.onload = () => { iconLoaded = true; };
-        // iconImg.onerror = () => { console.warn('图标加载失败，请检查路径'); };
-        // iconImg.src = 'icon.png';
-
-        function updateIconByJob() {
-            if (!iconImg) return;
-            iconLoaded = false;
-            iconImg.src = currentJob.icon;
-        }
-
-        // 初始化
-        iconImg = new Image();
-        iconImg.onload = () => { 
-            iconLoaded = true;
-            console.log('图标加载成功'); 
-        };
-        iconImg.onerror = () => { 
-            console.warn('图标加载失败，请检查路径'); 
-        };
-
-        // 初始职业图标
-        updateIconByJob();
+        iconImg.onload = () => { iconLoaded = true; };
+        iconImg.onerror = () => { console.warn('图标加载失败，请检查路径'); };
+        iconImg.src = 'icon.png';
 
         logoImg.onload = () => { logoLoaded = true; };
         logoImg.onerror = () => { console.warn('Logo加载失败，请检查路径'); };
@@ -376,7 +272,7 @@
         let selfbreak = 0;               // 自断发生的进度（0~1）
         let bladeflycdEndTime = null;    // 技能CD结束时间戳（秒）
 
-        let message = "有本事断我看看？~ 点击屏幕开始";
+        let message = "有本事飞我看看？~ 点击屏幕开始";
 
         // 进度条颜色 & 淡出控制
         const BAR_COLOR_NORMAL = '0,180,90';   // 绿色
@@ -524,7 +420,7 @@
             // CD 中点键：只提示，不改变状态
             if (bladeflycdEndTime !== null && now < bladeflycdEndTime) {
                 const remain = (bladeflycdEndTime - now).toFixed(1);
-                message = `别急，${currentJob.skillname}还在cd，剩余 ${remain} 秒。`;
+                message = `别急，剑飞还在cd，剩余 ${remain} 秒。`;
                 return;
             }
 
@@ -549,9 +445,8 @@
                 // 抢跑
                 state = "TOO_EARLY";
                 bladeflycdEndTime = now + BLADEFLY_CD;
-                // currentSkillSource = playSound('skill');
-                playSkillOnce();
-                message = "骗你到了吧~  菜，就多练！ ";
+                currentSkillSource = playSound('skill');
+                message = "飞空了！菜，就多练！ 骗到了！";
                 waitUntil = now + 0.4;
 
             } else if (state === "RUNNING") {
@@ -566,8 +461,7 @@
                 state = "RESULT";
                 bladeflycdEndTime = now + BLADEFLY_CD;
                 message = "好断，哥们儿好断! 点屏幕再来！";
-                // currentSkillSource = playSound('skill');
-                playSkillOnce();
+                currentSkillSource = playSound('skill');
 
                 // 记录命中瞬间的条长 + 红色淡出
                 barHitFraction = Math.max(0, Math.min(1, barFraction));
@@ -592,7 +486,7 @@
             if (state === "PREPARE") {
                 if (bladeflycdEndTime !== null && bladeflycdEndTime > now) {
                     const remain = (bladeflycdEndTime - now).toFixed(1);
-                    message = `等待${currentJob.skillname.slice(0, 2)}冷却 ${remain} 秒，随后开始读条...`;
+                    message = `等待技能冷却 ${remain} 秒，随后开始读条...`;
                 } else {
                     message = "准备好…… 我要生太极咯~ ...";
                 }
@@ -624,7 +518,7 @@
                 let frac = elapsed / BAR_DURATION;
 
                 if (state === "SAFE RUNNING") {
-                    message = `没${currentJob.skillname.slice(0,2)}了吧！ 美美生太极 ${elapsed.toFixed(2)} /0.56`;
+                    message = `没剑飞了吧！ 美美生太极 ${elapsed.toFixed(2)} /0.56`;
                 } else {
                     message = `生太极 ${elapsed.toFixed(2)} /0.56`;
                 }
@@ -654,7 +548,7 @@
                         playSound('finish');
 
                         if (state !== "SAFE RUNNING") {
-                            message = `这都${currentJob.name.slice(0, 2)}不到？菜，就多练 \\(^o^)/~ 再来？`;
+                            message = "这都飞不到？菜，就多练 \\(^o^)/~ 再来？";
                         } else {
                             message = "自断就上钩？菜，就多练 \\(^o^)/~ 再来？";
                         }
@@ -809,7 +703,7 @@
             ctx.font = `bold ${titleSize}px "Microsoft YaHei", Arial`;
             ctx.fillStyle = '#ffffff';
             ctx.textAlign = 'center';
-            ctx.fillText('折磨气纯模拟器v1.6', WIDTH / 2, HEIGHT * 0.25);
+            ctx.fillText('剑飞生太极模拟器v1.5', WIDTH / 2, HEIGHT * 0.25);
 
             // 提示文字
             const msgSize = Math.max(16, WIDTH * 0.04);
@@ -859,7 +753,7 @@
                     text = `本次反应时间：> ${(BAR_DURATION * 1000).toFixed(0)} ms (超时)`;
                 }
             } else if (state === "TOO_EARLY") {
-                text = "断空了，小笨蛋！";
+                text = "飞空了，小笨蛋！";
             } else {
                 text = "本次反应时间：-- ms";
             }
@@ -928,50 +822,9 @@
         // } catch (e) {
         //     console.warn('排行榜事件绑定失败', e);
         // }
-        try {
-            // const lbBtn = document.getElementById('leaderboardBtn');
-            // const closeBtn = document.getElementById('closeLeaderboardBtn');
-            // const saveBtn = document.getElementById('saveScoreBtn');
-            // const clearBtn = document.getElementById('clearLeaderboardBtn');
-            // const nameInput = document.getElementById('playerNameInput');
-
-
-            // === 新增：职业按钮事件 ===
-            const jobButtons = document.querySelectorAll('.job-btn');
-
-            jobButtons.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const jobKey = btn.getAttribute('data-job');
-                    if (!JOBS[jobKey]) return;
-
-                    // 只允许在 IDLE/RESULT/TOO_EARLY 状态切职业
-                    if (state !== 'IDLE' && state !== 'RESULT' && state !== 'TOO_EARLY') {
-                        message = '战斗中不能换职业哦~';
-                        return;
-                    }
-
-                    currentJobKey = jobKey;
-                    currentJob = JOBS[jobKey];
-                    bladeflyCD = currentJob.cd;
-
-                    updateIconByJob(); // 换 skill 图标
-
-                    // 按钮高亮
-                    jobButtons.forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-
-                    message = `已切换为 ${currentJob.name}，点击屏幕开始！`;
-                });
-            });
-
-            // 默认选中当前职业按钮
-            document.querySelector(`.job-btn[data-job="${currentJobKey}"]`)?.classList.add('active');
-
-        } catch (e) {
-            console.warn('事件绑定失败', e);
-        }
 
         gameLoop();
     </script>
 </body>
 </html>
+
