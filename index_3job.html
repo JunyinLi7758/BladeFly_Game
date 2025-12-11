@@ -566,7 +566,8 @@
                 state = "RESULT";
                 bladeflycdEndTime = now + BLADEFLY_CD;
                 message = "好断，哥们儿好断! 点屏幕再来！";
-                currentSkillSource = playSound('skill');
+                // currentSkillSource = playSound('skill');
+                playSkillOnce();
 
                 // 记录命中瞬间的条长 + 红色淡出
                 barHitFraction = Math.max(0, Math.min(1, barFraction));
