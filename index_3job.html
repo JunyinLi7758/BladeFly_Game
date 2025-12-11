@@ -592,7 +592,7 @@
             if (state === "PREPARE") {
                 if (bladeflycdEndTime !== null && bladeflycdEndTime > now) {
                     const remain = (bladeflycdEndTime - now).toFixed(1);
-                    message = `等待技能冷却 ${remain} 秒，随后开始读条...`;
+                    message = `等待${currentJob.skillname.slice(0, 2)}冷却 ${remain} 秒，随后开始读条...`;
                 } else {
                     message = "准备好…… 我要生太极咯~ ...";
                 }
@@ -624,7 +624,7 @@
                 let frac = elapsed / BAR_DURATION;
 
                 if (state === "SAFE RUNNING") {
-                    message = `没${currentJob.skillname}了吧！ 美美生太极 ${elapsed.toFixed(2)} /0.56`;
+                    message = `没${currentJob.skillname.slice(0,2)}了吧！ 美美生太极 ${elapsed.toFixed(2)} /0.56`;
                 } else {
                     message = `生太极 ${elapsed.toFixed(2)} /0.56`;
                 }
@@ -654,7 +654,7 @@
                         playSound('finish');
 
                         if (state !== "SAFE RUNNING") {
-                            message = `这都断不到？菜，就多练 \\(^o^)/~ 再来？`;
+                            message = `这都${currentJob.name.slice(0, 2)}不到？菜，就多练 \\(^o^)/~ 再来？`;
                         } else {
                             message = "自断就上钩？菜，就多练 \\(^o^)/~ 再来？";
                         }
