@@ -488,7 +488,7 @@
                     const remain = (bladeflycdEndTime - now).toFixed(1);
                     message = `等待技能冷却 ${remain} 秒，随后开始读条...`;
                 } else {
-                    message = "准备中，等我生个太极...";
+                    message = "准备好…… 我要生太极咯~ ...";
                 }
 
                 if (now >= waitUntil) {
@@ -708,13 +708,13 @@
             ctx.fillStyle = '#dcdcdc';
             ctx.fillText(message, WIDTH / 2, HEIGHT * 0.36);
 
-            // 上一轮成绩
-            if (lastReactionMs !== null) {
-                const smallSize = Math.max(12, WIDTH * 0.03);
-                ctx.font = `${smallSize}px "Microsoft YaHei", Arial`;
-                ctx.fillStyle = '#9fd9ff';
-                ctx.fillText(`上一轮反应: ${Math.round(lastReactionMs)} ms`, WIDTH / 2, HEIGHT * 0.40);
-            }
+//           // 上一轮成绩
+//            if (lastReactionMs !== null) {
+//               const smallSize = Math.max(12, WIDTH * 0.03);
+//                ctx.font = `${smallSize}px "Microsoft YaHei", Arial`;
+//               ctx.fillStyle = '#9fd9ff';
+//                ctx.fillText(`上一轮反应: ${Math.round(lastReactionMs)} ms`, WIDTH / 2, HEIGHT * 0.40);
+//            }
 
             // 进度条背景
             ctx.fillStyle = '#505050';
@@ -824,3 +824,4 @@
     </script>
 </body>
 </html>
+
