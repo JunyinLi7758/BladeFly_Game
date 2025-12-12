@@ -196,7 +196,7 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        
+
         // ===== 职业配置 =====
         // 每个职业可以指定：图标、条读音效、技能音效、结束音效、CD
         const JOBS = {
@@ -230,6 +230,7 @@
         const soundBuffers = {};
         let isAudioReady = false;
 
+        //  加载音效函数
         async function loadAudioBuffer(name, filePath) {
             try {
                 const response = await fetch(filePath);
@@ -242,24 +243,30 @@
                 return null;
             }
         }
+
+        // 上层音效函数
+        // 播放循环音效函数
         function playBarLoop() {
             stopSound(currentBarSource);
             if (!currentJob.barSound) return;
             currentBarSource = playSound(currentJob.barSound, true);
         }
 
+        // 播放技能音效（单次）
         function playSkillOnce() {
             if (!currentJob.skillSound) return;
             stopSound(currentSkillSource);
             currentSkillSource = playSound(currentJob.skillSound, false);
         }
 
+        // 结束播放音效（单次）
         function playFinishOnce() {
             if (!currentJob.finishSound) return;
             playSound(currentJob.finishSound, false);
         }
 
-
+        // 底层音效函数
+        // 播放音效
         function playSound(name, loop = false) {
             const buffer = soundBuffers[name];
             if (!buffer) {
@@ -279,11 +286,14 @@
             }
         }
 
+        // 停止音效
         function stopSound(source) {
             if (!source) return;
             try { source.stop(0); } catch (e) {}
         }
 
+
+        // 预加载所有音效
         Promise.all([
             loadAudioBuffer('bar', 'sound/bar.MP3'),
             loadAudioBuffer('skill', 'sound/skill.MP3'),
