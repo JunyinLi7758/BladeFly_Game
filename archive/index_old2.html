@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>试试飞我的太极！</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+        }
+        
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            padding: 0;
+        }
+        
+        .container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background: #1e1e1e;
+            position: relative;
+        }
+        
+        canvas {
+            display: block;
+            background: #1e1e1e;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+        
+        .info {
+            position: fixed;
+            bottom: 10px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            padding: 10px;
+            background: rgba(45, 45, 45, 0.8);
+            color: #aaa;
+            font-size: 12px;
+            z-index: 10;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .info {
+                font-size: 11px;
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas"></canvas>
+        <div class="info">
+            点击屏幕开始 | 长按退出
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 图片资源 - 使用新的 Image 对象确保正确加载
+        let iconLoaded = false;
+        let logoLoaded = false;
+        let iconImg = null;
+        let logoImg = null;
+
+        // 加载图标
+        iconImg = new Image();
+        iconImg.onload = () => { 
+            iconLoaded = true;
+            console.log('图标加载成功'); 
+        };
+        iconImg.onerror = () => { 
+            console.warn('图标加载失败，请检查路径'); 
+        };
+        iconImg.src = 'icon.png';
+
+        // 加载 Logo
+        logoImg = new Image();
+        logoImg.onload = () => { 
+            logoLoaded = true;
+            console.log('Logo加载成功'); 
+        };
+        logoImg.onerror = () => { 
+            console.warn('Logo加载失败，请检查路径'); 
+        };
+        logoImg.src = 'logo.png';
+
+        // 常数定义
+        let WIDTH = 900;
+        let HEIGHT = 450;
+        const BAR_DURATION = 0.56;
+        const BAR_WIDTH_MAX = 600;
+        const BAR_HEIGHT = 40;
+        const BLADEFLY_CD = 3.0;
+
+        // 设置画布尺寸以适配不同屏幕
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            
+            WIDTH = rect.width;
+            HEIGHT = rect.height;
+            
+            ctx.scale(dpr, dpr);
+        }
+
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(resizeCanvas, 100);
+        });
+
+        // 游戏状态
+        let state = "IDLE";
+        let waitUntil = null;
+        let signalTime = null;
+        let startTime = null;
+        let reactionTime = null;
+        let barFraction = 0.0;
+        let bladeflyCD = BLADEFLY_CD;
+        let bladeflycdEndTime = null;
+        let message = "有本事飞我看看？~ 点击屏幕开始测试。";
+        let selfbreak = 0;
+
+        // 图标数据（响应式）
+        let iconSize = Math.min(WIDTH * 0.15, 100);
+        let iconX = (WIDTH - iconSize) / 2;
+        let iconY = HEIGHT * 0.62;
+
+        // 长按检测变量
+        let touchStartTime = 0;
+        const LONG_PRESS_TIME = 1000; // 1秒为长按
+
+        // 输入处理
+        let keyPressed = {};
+        
+        // 键盘输入（用于桌面端）
+        window.addEventListener('keydown', (e) => {
+            keyPressed[e.key] = true;
+            
+            if (e.key === 'Escape') {
+                state = "IDLE";
+                return;
+            }
+
+            if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                handleSpaceKey();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keyPressed[e.key] = false;
+        });
+
+        // 触摸事件处理（手机端）
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchStartTime = Date.now();
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            const touchDuration = Date.now() - touchStartTime;
+            
+            if (touchDuration > LONG_PRESS_TIME) {
+                // 长按退出
+                state = "IDLE";
+            } else {
+                // 短按触发游戏
+                handleSpaceKey();
+            }
+        });
+
+        // 鼠标点击（用于桌面端）
+        canvas.addEventListener('click', () => {
+            handleSpaceKey();
+        });
+
+        function handleSpaceKey() {
+            const now = performance.now() / 1000;
+
+            if (bladeflycdEndTime !== null && now < bladeflycdEndTime) {
+                // 技能在CD中
+                message = `剑飞还在冷却中，剩余 ${(bladeflycdEndTime - now).toFixed(1)} 秒。`;
+                return;
+            }
+
+            if (state === "IDLE" || state === "RESULT" || state === "TOO_EARLY") {
+                // 重新开始一轮测试
+                state = "PREPARE";
+                barFraction = 0.0;
+                reactionTime = null;
+                signalTime = null;
+                startTime = null;
+                const delay = Math.random() * 2.0 + 1.0; // 1~3秒
+                waitUntil = now + delay;
+                message = "我要生太极咯？~ ";
+
+            } else if (state === "PREPARE") {
+                // 抢跑
+                state = "TOO_EARLY";
+                bladeflycdEndTime = now + bladeflyCD;
+                message = "飞空了！菜，就多练！ 骗到了！";
+                const delay = 0.4;
+                waitUntil = now + delay;
+
+            } else if (state === "RUNNING") {
+                // 有效反应
+                reactionTime = now - signalTime;
+                state = "RESULT";
+                bladeflycdEndTime = now + bladeflyCD;
+                message = "好断，哥们儿好断 按 空格 / 回车 再测一次。";
+
+            } else if (state === "SAFE RUNNING") {
+                // 安全进行中，什么都不做或跳过
+            }
+        }
+
+        function update() {
+            const now = performance.now() / 1000;
+
+            if (state === "PREPARE") {
+                if (now >= waitUntil) {
+                    state = "RUNNING";
+                    signalTime = now;
+                    startTime = now;
+                    barFraction = 0.0;
+                    selfbreak = Math.random() * 1.4 + 0.1; // 0.1~1.5秒
+                }
+
+            } else if (state === "TOO_EARLY") {
+                if (now >= waitUntil) {
+                    state = "SAFE RUNNING";
+                    signalTime = now;
+                    startTime = now;
+                    barFraction = 0.0;
+                    selfbreak = 2.0;
+                }
+
+            } else if (state === "RUNNING" || state === "SAFE RUNNING") {
+                const elapsed = now - startTime;
+                let frac = elapsed / BAR_DURATION;
+
+                if (state === "SAFE RUNNING") {
+                    message = `没剑飞了吧！ 美美生太极 ${elapsed.toFixed(2)} /0.56`;
+                } else {
+                    message = `生太极 ${elapsed.toFixed(2)} /0.56`;
+                }
+
+                if (frac >= selfbreak) {
+                    state = "PREPARE";
+                    barFraction = 0.0;
+                    reactionTime = null;
+                    signalTime = null;
+                    startTime = null;
+                    const delay = Math.random() * 0.6 + 0.2; // 0.2~0.8秒
+                    waitUntil = now + delay;
+                    message = `在${elapsed.toFixed(2)}秒时，哥们自断了！~`;
+                    frac = 0.0;
+                }
+
+                if (frac >= 1.0) {
+                    frac = 1.0;
+                    if (reactionTime === null) {
+                        state = "RESULT";
+                        reactionTime = null;
+                        if (state !== "SAFE RUNNING") {
+                            message = "骗到你了！菜，就多练 \\(^o^)/~ 按 空格 / 回车 再测一次。";
+                        } else {
+                            message = "菜，就多练 \\(^o^)/~ 按 空格 / 回车 再测一次。";
+                        }
+                    }
+                }
+
+                barFraction = frac;
+            }
+        }
+
+        function drawCDFan(x, y, size, fraction) {
+            if (fraction <= 0) return;
+
+            const w = size;
+            const h = size;
+            const cx = x + w / 2;
+            const cy = y + h / 2;
+
+            if (fraction >= 1) {
+                // CD满：整个方形全黑
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.63)';
+                ctx.fillRect(x, y, w, h);
+            } else {
+                // 方形CD遮罩：从中心环绕，顺时针消失
+                ctx.save();
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.63)';
+
+                // 定义方形的四个角和边界点
+                // 从12点方向（上方）开始，顺时针
+                const points = [
+                    { x: cx, y: y },           // 上中点 - 0°
+                    { x: x + w, y: y },        // 右上角 - 45°
+                    { x: x + w, y: cy },       // 右中点 - 90°
+                    { x: x + w, y: y + h },    // 右下角 - 135°
+                    { x: cx, y: y + h },       // 下中点 - 180°
+                    { x: x, y: y + h },        // 左下角 - 225°
+                    { x: x, y: cy },           // 左中点 - 270°
+                    { x: x, y: y },            // 左上角 - 315°
+                    { x: cx, y: y }            // 回到上中点 - 360°
+                ];
+
+                // 总周长点数（用于计算分段）
+                const totalPoints = points.length - 1;
+                const endIdx = Math.floor(totalPoints * (1 - fraction));
+
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);  // 从中心开始
+
+                // 绘制扇形遮罩
+                for (let i = 0; i <= endIdx; i++) {
+                    ctx.lineTo(points[i].x, points[i].y);
+                }
+
+                // 如果不是整数，还需要绘制部分线段
+                if (endIdx < totalPoints) {
+                    const t = (totalPoints * (1 - fraction)) % 1;
+                    const nextIdx = endIdx + 1;
+                    const p1 = points[endIdx];
+                    const p2 = points[nextIdx];
+                    const px = p1.x + (p2.x - p1.x) * t;
+                    const py = p1.y + (p2.y - p1.y) * t;
+                    ctx.lineTo(px, py);
+                }
+
+                ctx.lineTo(cx, cy);  // 回到中心
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function drawRoundedRect(x, y, w, h, radius, color, fill = true) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + w - radius, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+            ctx.lineTo(x + w, y + h - radius);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+            ctx.lineTo(x + radius, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+            
+            if (fill) {
+                ctx.fill();
+            } else {
+                ctx.stroke();
+            }
+        }
+
+        function draw() {
+            // 清空画布
+            ctx.fillStyle = '#1e1e1e';
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            const now = performance.now() / 1000;
+
+            // 更新响应式尺寸
+            iconSize = Math.min(WIDTH * 0.15, 100);
+            iconX = (WIDTH - iconSize) / 2;
+            iconY = HEIGHT * 0.62;
+
+            // 绘制 Logo（如果加载成功）
+            if (logoLoaded && logoImg) {
+                try {
+                    // 获取原始图片宽高比
+                    const aspectRatio = logoImg.width / logoImg.height;
+                    const logoHeight = Math.min(HEIGHT * 0.15, 80);
+                    const logoWidth = logoHeight * aspectRatio;
+                    const logoX = (WIDTH - logoWidth) / 2;
+                    const logoY = HEIGHT * 0.05;
+                    ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
+                } catch (e) {
+                    console.warn('Logo绘制失败:', e);
+                }
+            }
+
+            // 绘制图标和CD遮罩
+            if (iconLoaded && iconImg) {
+                try {
+                    ctx.drawImage(iconImg, iconX, iconY, iconSize, iconSize);
+                } catch (e) {
+                    console.warn('图标绘制失败:', e);
+                    // 备用占位符
+                    ctx.fillStyle = '#4a6fa5';
+                    ctx.fillRect(iconX, iconY, iconSize, iconSize);
+                }
+            } else {
+                // 如果图片未加载，显示占位符
+                ctx.fillStyle = '#4a6fa5';
+                ctx.fillRect(iconX, iconY, iconSize, iconSize);
+                ctx.strokeStyle = '#666';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(iconX, iconY, iconSize, iconSize);
+            }
+
+            // 计算CD进度
+            let cdFraction = 0.0;
+            if (bladeflycdEndTime !== null) {
+                const cdRemaining = bladeflycdEndTime - now;
+                if (cdRemaining > 0) {
+                    cdFraction = cdRemaining / bladeflyCD;
+                } else {
+                    cdFraction = 0.0;
+                    bladeflycdEndTime = null;
+                }
+            }
+            drawCDFan(iconX, iconY, iconSize, cdFraction);
+
+            // 绘制标题
+            const titleSize = Math.max(24, WIDTH * 0.06);
+            ctx.font = `bold ${titleSize}px "Microsoft YaHei", Arial`;
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.fillText('试试飞我的太极！', WIDTH / 2, HEIGHT * 0.25);
+
+            // 绘制消息
+            const msgSize = Math.max(16, WIDTH * 0.04);
+            ctx.font = `${msgSize}px "Microsoft YaHei", Arial`;
+            ctx.fillStyle = '#dcdcdc';
+            ctx.textAlign = 'center';
+            ctx.fillText(message, WIDTH / 2, HEIGHT * 0.36);
+
+            // 绘制进度条背景
+            ctx.fillStyle = '#505050';
+            const barX = (WIDTH - BAR_WIDTH_MAX) / 2;
+            const barY = HEIGHT * 0.47;
+            const barWidth = Math.min(BAR_WIDTH_MAX, WIDTH * 0.8);
+            const barHeight = Math.max(20, HEIGHT * 0.08);
+            drawRoundedRect(barX - (barWidth - BAR_WIDTH_MAX) / 2, barY, barWidth, barHeight, 8, '#505050');
+
+            // 绘制进度条填充
+            if (barFraction > 0) {
+                ctx.fillStyle = '#00b45a';
+                const fillWidth = barWidth * barFraction;
+                drawRoundedRect(barX - (barWidth - BAR_WIDTH_MAX) / 2, barY, fillWidth, barHeight, 8, '#00b45a');
+            }
+
+            // 绘制反应时间
+            let text;
+            if (state === "RESULT") {
+                if (reactionTime !== null) {
+                    text = `本次反应时间：${(reactionTime * 1000).toFixed(1)} ms`;
+                } else {
+                    text = `本次反应时间：> ${(BAR_DURATION * 1000).toFixed(0)} ms (超时)`;
+                }
+            } else if (state === "TOO_EARLY") {
+                text = "飞空了，小笨蛋！";
+            } else {
+                text = "本次反应时间：-- ms";
+            }
+
+            const resultSize = Math.max(16, WIDTH * 0.04);
+            ctx.font = `${resultSize}px "Microsoft YaHei", Arial`;
+            ctx.fillStyle = '#ffff00';
+            ctx.textAlign = 'center';
+            ctx.fillText(text, WIDTH / 2, HEIGHT * 0.85);
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 启动游戏
+        gameLoop();
+    </script>
+</body>
+</html>
