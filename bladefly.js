@@ -1,0 +1,796 @@
+'use strict';
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+
+    // ===== 职业配置 =====
+    // 每个职业可以指定：图标、条读音效、技能音效、结束音效、CD
+    const JOBS = {
+        Blade: {
+            name: '剑纯',
+            skillname:'剑飞惊天',
+            icon: 'icon_blade.png',        // 你自己放对应图片
+            skillSound: 'skill_blade',
+        },
+        Flower: {
+            name: '万花',
+            skillname:'厥阴指',
+            icon: 'icon_flower.png',
+            skillSound: 'skill_flower',
+        },
+        Toxic: {
+            name: '五毒',
+            skillname:'灵蛊',
+            icon: 'icon_toxic.png',
+            skillSound: 'skill_toxic',
+        }
+    };
+
+    // 当前职业
+    let currentJobKey = 'Blade';
+    let currentJob = JOBS[currentJobKey];
+
+    /* ========== 音效系统 ========== */
+
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const soundBuffers = {};
+    let isAudioReady = false;
+
+    //  加载音效函数
+    async function loadAudioBuffer(name, filePath) {
+        try {
+            const response = await fetch(filePath);
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            soundBuffers[name] = audioBuffer;
+            return audioBuffer;
+        } catch (e) {
+            console.error(`音效 ${name} 加载失败:`, e);
+            return null;
+        }
+    }
+
+    // 上层音效函数
+    // 播放循环音效函数
+    function playBarLoop() {
+        stopSound(currentBarSource);
+        if (!currentJob.barSound) return;
+        currentBarSource = playSound(currentJob.barSound, true);
+    }
+
+    // 播放技能音效（单次）
+    function playSkillOnce() {
+        if (!currentJob.skillSound) return;
+        stopSound(currentSkillSource);
+        currentSkillSource = playSound(currentJob.skillSound, false);
+    }
+
+    // 结束播放音效（单次）
+    function playFinishOnce() {
+        if (!currentJob.finishSound) return;
+        playSound(currentJob.finishSound, false);
+    }
+
+    // 底层音效函数
+    // 播放音效
+    function playSound(name, loop = false) {
+        const buffer = soundBuffers[name];
+        if (!buffer) {
+            console.warn(`音效 ${name} 未加载，无法播放`);
+            return null;
+        }
+        try {
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.loop = loop;
+            source.connect(audioContext.destination);
+            source.start(0);
+            return source;
+        } catch (e) {
+            console.error(`播放音效 ${name} 失败:`, e);
+            return null;
+        }
+    }
+
+    // 停止音效
+    function stopSound(source) {
+        if (!source) return;
+        try { source.stop(0); } catch (e) {}
+    }
+
+
+    // 预加载所有音效
+    Promise.all([
+        loadAudioBuffer('bar', 'sound/bar.MP3'),
+        loadAudioBuffer('skill', 'sound/skill.MP3'),
+        loadAudioBuffer('finish', 'sound/finish.MP3'),
+        
+        loadAudioBuffer('skill_blade', 'sound/skill_blade.MP3'),
+        loadAudioBuffer('skill_flower', 'sound/skill_flower.MP3'),
+        loadAudioBuffer('skill_toxic', 'sound/skill_toxic.MP3'),
+
+    ]).then(() => {
+        isAudioReady = true;
+        console.log('✓ 所有音效加载完成');
+    }).catch(err => {
+        console.warn('⚠ 某些音效加载失败', err);
+    });
+
+    let currentBarSource = null;
+    let currentSkillSource = null;
+
+    /* ========== 图片资源 ========== */
+    // =========================
+    // #region 图片资源
+    let logoLoaded = false;
+    let logoImg = new Image();
+
+    logoImg.onload = () => { logoLoaded = true; };
+    logoImg.onerror = () => { console.warn('Logo加载失败，请检查路径'); };
+    logoImg.src = 'logo.png';
+
+
+    // 更新 技能图标(函数)
+    function updateIconByJob() {
+        if (!iconImg) return;
+        iconLoaded = false;
+        iconImg.src = currentJob.icon;
+    }
+
+    // 初始化 技能图标
+    let iconLoaded = false;
+    iconImg = new Image();
+    iconImg.onload = () => { 
+        iconLoaded = true;
+        console.log('图标加载成功'); 
+    };
+    iconImg.onerror = () => { 
+        console.warn('图标加载失败，请检查路径'); 
+    };
+
+    // 更新 技能图标
+    updateIconByJob();
+//#endregion
+    // =========================
+
+
+// =========================
+// 基本常量与画布
+// =========================
+    /* ========== 基本常量与画布 ========== */
+
+    let WIDTH = 900;
+    let HEIGHT = 450;
+
+    const BAR_DURATION = 0.56;   // 读条总时长（秒）
+    const BAR_WIDTH_MAX = 600;
+    const BLADEFLY_CD   = 3.0;   // 技能冷却时间（秒）
+
+    function resizeCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+
+        canvas.width  = rect.width  * dpr;
+        canvas.height = rect.height * dpr;
+
+        WIDTH  = rect.width;
+        HEIGHT = rect.height;
+
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('orientationchange', () => {
+        setTimeout(resizeCanvas, 100);
+    });
+
+    /* ========== 游戏状态机 ========== */
+
+    let state = "IDLE";              // IDLE / PREPARE / RUNNING / TOO_EARLY / SAFE RUNNING / RESULT
+    let waitUntil = null;            // PREPARE / TOO_EARLY 等待到的时间点
+    let signalTime = null;           // 开始计反应时间的时刻
+    let startTime = null;            // 读条开始时间
+    let reactionTime = null;         // 当前这轮的反应时间（秒）
+    let lastReactionMs = null;       // 上一轮的反应时间（ms）
+
+    let barFraction = 0.0;           // 读条进度 0~1
+    let selfbreak = 0;               // 自断发生的进度（0~1）
+    let bladeflycdEndTime = null;    // 技能CD结束时间戳（秒）
+
+    let message = "有本事断我看看？~ 点击屏幕开始";
+
+    // 进度条颜色 & 淡出控制
+    const BAR_COLOR_NORMAL = '0,180,90';   // 绿色
+    const BAR_COLOR_HIT    = '255,64,64';  // 红色
+
+    let barRgb = BAR_COLOR_NORMAL;
+    let barAlpha = 1.0;
+
+    let barFadeActive = false;
+    let barFadeStartTime = 0;
+    const BAR_FADE_DURATION = 0.4;        // 红条淡出时长
+
+    let barHitFraction = 0.0;             // 命中瞬间的条长
+
+    // 图标位置（实际在 draw 中每帧按窗口更新）
+    let iconSize = Math.min(WIDTH * 0.15, 100);
+    let iconX = (WIDTH - iconSize) / 2;
+    let iconY = HEIGHT * 0.62;
+
+    /* ========== 排行榜（localStorage） ========== */
+
+    const LEADERBOARD_KEY = 'bladefly_leaderboard';
+    const LEADERBOARD_MAX = 10;
+
+    function loadLeaderboard() {
+        try {
+            const raw = localStorage.getItem(LEADERBOARD_KEY);
+            if (!raw) return [];
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            console.warn('读取排行榜失败', e);
+            return [];
+        }
+    }
+
+    function saveLeaderboard(list) {
+        try {
+            localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(list));
+        } catch (e) {
+            console.warn('保存排行榜失败', e);
+        }
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>\"']/g, c => ({
+            '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"
+        }[c]));
+    }
+
+    function renderLeaderboard(highlightEntry) {
+        const container = document.getElementById('leaderboardList');
+        if (!container) return;
+
+        const list = loadLeaderboard();
+        if (list.length === 0) {
+            container.innerHTML = '<div style="padding:8px;color:#999">暂无成绩，快去测试你的反应吧！</div>';
+            return;
+        }
+
+        const html = list.map((it, idx) => {
+            const dateLabel = (new Date(it.at)).toLocaleString();
+            const highlight = (highlightEntry && highlightEntry.at === it.at) ? ' highlight' : '';
+            return `
+                <div class="leaderboard-item${highlight}">
+                    <div>#${idx+1} ${escapeHtml(it.name)}</div>
+                    <div>
+                        <strong>${it.time} ms</strong>
+                        <div style="font-size:11px;color:#888">${dateLabel}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = html;
+    }
+
+    function showLeaderboardOverlay() {
+        const ov = document.getElementById('leaderboardOverlay');
+        if (!ov) return;
+        ov.classList.remove('hidden');
+        ov.setAttribute('aria-hidden', 'false');
+        renderLeaderboard();
+    }
+
+    function hideLeaderboardOverlay() {
+        const ov = document.getElementById('leaderboardOverlay');
+        if (!ov) return;
+        ov.classList.add('hidden');
+        ov.setAttribute('aria-hidden', 'true');
+    }
+
+    // 成功时弹出保存对话框
+    function promptSaveScore(timeMs) {
+        const overlay = document.getElementById('leaderboardOverlay');
+        const label   = document.getElementById('currentTimeLabel');
+        const input   = document.getElementById('playerNameInput');
+        if (!overlay || !label || !input) return;
+
+        label.textContent = `${Math.round(timeMs)} ms`;
+        input.value = `玩家${Math.floor(Math.random()*1000)}`;
+        showLeaderboardOverlay();
+        setTimeout(() => { input.focus(); input.select(); }, 100);
+        renderLeaderboard();
+    }
+
+    /* ========== 输入事件（统一走 handleSpaceKey） ========== */
+
+    let touchStartTime = 0;
+    const LONG_PRESS_TIME = 1000; // 1秒长按退出
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            state = "IDLE";
+            return;
+        }
+        if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            handleSpaceKey();
+        }
+    });
+
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        touchStartTime = Date.now();
+    });
+
+    canvas.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        const touchDuration = Date.now() - touchStartTime;
+        if (touchDuration > LONG_PRESS_TIME) {
+            state = "IDLE";
+        } else {
+            handleSpaceKey();
+        }
+    });
+
+    canvas.addEventListener('click', () => {
+        handleSpaceKey();
+    });
+
+    function handleSpaceKey() {
+        const now = performance.now() / 1000;
+
+        // CD 中点键：只提示，不改变状态
+        if (bladeflycdEndTime !== null && now < bladeflycdEndTime) {
+            const remain = (bladeflycdEndTime - now).toFixed(1);
+            message = `别急，${currentJob.skillname}还在cd，剩余 ${remain} 秒。`;
+            return;
+        }
+
+        if (state === "IDLE" || state === "RESULT" || state === "TOO_EARLY") {
+            // 开始新一轮单次测试：重置进度条显示
+            barRgb = BAR_COLOR_NORMAL;
+            barAlpha = 1.0;
+            barFadeActive = false;
+            barHitFraction = 0;
+            barFraction = 0;
+            reactionTime = null;
+
+            state = "PREPARE";
+            signalTime = null;
+            startTime  = null;
+
+            const delay = Math.random() * 2.0 + 1.0; // 1~3秒
+            waitUntil = now + delay;
+            message = "准备中...";
+
+        } else if (state === "PREPARE") {
+            // 抢跑
+            state = "TOO_EARLY";
+            bladeflycdEndTime = now + BLADEFLY_CD;
+            // currentSkillSource = playSound('skill');
+            playSkillOnce();
+            message = "骗你到了吧~  菜，就多练！ ";
+            waitUntil = now + 0.4;
+
+        } else if (state === "RUNNING") {
+            // 有效打断
+            stopSound(currentBarSource);
+            currentBarSource = null;
+
+            reactionTime = now - signalTime;      // 秒
+            const reactionMs = Math.round(reactionTime * 1000);
+            lastReactionMs = reactionMs;
+
+            state = "RESULT";
+            bladeflycdEndTime = now + BLADEFLY_CD;
+            message = "好断，哥们儿好断! 点屏幕再来！";
+            // currentSkillSource = playSound('skill');
+            playSkillOnce();
+
+            // 记录命中瞬间的条长 + 红色淡出
+            barHitFraction = Math.max(0, Math.min(1, barFraction));
+            barRgb = BAR_COLOR_HIT;
+            barAlpha = 1.0;
+            barFadeActive = true;
+            barFadeStartTime = now;
+
+            // 弹出保存成绩窗口（只对成功打断，不含超时）
+            // promptSaveScore(reactionMs);
+
+        } else if (state === "SAFE RUNNING") {
+            // 已经被判抢跑，不再允许通过按键“赚”反应时间
+        }
+    }
+
+    /* ========== 逻辑更新 ========== */
+
+    function update() {
+        const now = performance.now() / 1000;
+
+        if (state === "PREPARE") {
+            if (bladeflycdEndTime !== null && bladeflycdEndTime > now) {
+                const remain = (bladeflycdEndTime - now).toFixed(1);
+                message = `等待${currentJob.skillname.slice(0, 2)}冷却 ${remain} 秒，随后开始读条...`;
+            } else {
+                message = "准备好…… 我要生太极咯~ ...";
+            }
+
+            if (now >= waitUntil) {
+                stopSound(currentBarSource);
+                currentBarSource = playSound('bar', true);
+                state = "RUNNING";
+                signalTime = now;
+                startTime  = now;
+                barFraction = 0.0;
+                selfbreak = Math.random() * 1.4 + 0.1; // 自断在 0.1~1.5 * BAR_DURATION 之间
+                if (selfbreak >= 0.8 && selfbreak <=1.1 ){
+                selfbreak = 1.1;
+                }
+            }
+
+        } else if (state === "TOO_EARLY") {
+            if (now >= waitUntil) {
+                state = "SAFE RUNNING";
+                signalTime = now;
+                startTime  = now;
+                barFraction = 0.0;
+                selfbreak = 2.0; // 基本不会自断，直到读满
+            }
+
+        } else if (state === "RUNNING" || state === "SAFE RUNNING") {
+            const elapsed = now - startTime;
+            let frac = elapsed / BAR_DURATION;
+
+            if (state === "SAFE RUNNING") {
+                message = `没${currentJob.skillname.slice(0,2)}了吧！ 美美生太极 ${elapsed.toFixed(2)} /0.56`;
+            } else {
+                message = `生太极 ${elapsed.toFixed(2)} /0.56`;
+            }
+
+            // 自断逻辑
+            if (frac >= selfbreak) {
+                stopSound(currentBarSource);
+                currentBarSource = null;
+
+                state = "PREPARE";
+                barFraction  = 0.0;
+                reactionTime = null;
+                signalTime   = null;
+                startTime    = null;
+                const delay = Math.random() * 0.6 + 0.2; // 0.2~0.8秒后再准备
+                waitUntil = now + delay;
+                message = `在${elapsed.toFixed(2)}秒时，哥们自断了！~`;
+                frac = 0.0;
+            }
+
+            // 超时逻辑（你没按）
+            if (frac >= 1.0) {
+                frac = 1.0;
+                if (reactionTime === null) {
+                    stopSound(currentBarSource);
+                    currentBarSource = null;
+                    playSound('finish');
+
+                    if (state !== "SAFE RUNNING") {
+                        message = `这都${currentJob.skillname.slice(0, 2)}不到？菜，就多练 \\(^o^)/~ 再来？`;
+                    } else {
+                        message = "自断就上钩？菜，就多练 \\(^o^)/~ 再来？";
+                    }
+                    state = "RESULT";
+                    reactionTime = null;
+                    // 超时不计入排行榜
+                }
+            }
+
+            barFraction = frac;
+        }
+
+        // 红色条淡出：只改透明度，不改长度
+        if (barFadeActive) {
+            const t = (now - barFadeStartTime) / BAR_FADE_DURATION;
+            if (t >= 1) {
+                barAlpha = 0;
+                barFadeActive = false;
+            } else {
+                barAlpha = 1 - t;
+            }
+        } else {
+            barAlpha = 1.0;
+        }
+    }
+
+    /* ========== 绘制 ========== */
+
+    function drawCDFan(x, y, size, fraction) {
+        if (fraction <= 0) return;
+
+        const w = size;
+        const h = size;
+        const cx = x + w / 2;
+        const cy = y + h / 2;
+
+        if (fraction >= 1) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.63)';
+            ctx.fillRect(x, y, w, h);
+        } else {
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.63)';
+
+            const points = [
+                { x: cx,     y: y        },
+                { x: x + w,  y: y        },
+                { x: x + w,  y: cy       },
+                { x: x + w,  y: y + h    },
+                { x: cx,     y: y + h    },
+                { x: x,      y: y + h    },
+                { x: x,      y: cy       },
+                { x: x,      y: y        },
+                { x: cx,     y: y        }
+            ];
+
+            const totalPoints = points.length - 1;
+            const endIdx = Math.floor(totalPoints * (1 - fraction));
+
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+
+            for (let i = 0; i <= endIdx; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+
+            if (endIdx < totalPoints) {
+                const t = (totalPoints * (1 - fraction)) % 1;
+                const nextIdx = endIdx + 1;
+                const p1 = points[endIdx];
+                const p2 = points[nextIdx];
+                const px = p1.x + (p2.x - p1.x) * t;
+                const py = p1.y + (p2.y - p1.y) * t;
+                ctx.lineTo(px, py);
+            }
+
+            ctx.lineTo(cx, cy);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    function drawRoundedRect(x, y, w, h, radius) {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + w - radius, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+        ctx.lineTo(x + w, y + h - radius);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+        ctx.lineTo(x + radius, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    function draw() {
+        ctx.fillStyle = '#1e1e1e';
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+        const now = performance.now() / 1000;
+
+        // 更新 icon 尺寸与位置
+        iconSize = Math.min(WIDTH * 0.15, 100);
+        iconX = (WIDTH - iconSize) / 2;
+        iconY = HEIGHT * 0.62;
+
+        // Logo
+        if (logoLoaded && logoImg) {
+            try {
+                const aspectRatio = logoImg.width / logoImg.height;
+                const logoHeight = Math.min(HEIGHT * 0.15, 80);
+                const logoWidth  = logoHeight * aspectRatio;
+                const logoX = (WIDTH - logoWidth) / 2;
+                const logoY = HEIGHT * 0.05;
+                ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
+            } catch (e) {}
+        }
+
+        // Icon
+        if (iconLoaded && iconImg) {
+            try {
+                ctx.drawImage(iconImg, iconX, iconY, iconSize, iconSize);
+            } catch (e) {
+                ctx.fillStyle = '#4a6fa5';
+                ctx.fillRect(iconX, iconY, iconSize, iconSize);
+            }
+        } else {
+            ctx.fillStyle = '#4a6fa5';
+            ctx.fillRect(iconX, iconY, iconSize, iconSize);
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(iconX, iconY, iconSize, iconSize);
+        }
+
+        // CD 扇形
+        let cdFraction = 0.0;
+        if (bladeflycdEndTime !== null) {
+            const cdRemaining = bladeflycdEndTime - now;
+            if (cdRemaining > 0) {
+                cdFraction = cdRemaining / BLADEFLY_CD;
+            } else {
+                cdFraction = 0.0;
+                bladeflycdEndTime = null;
+            }
+        }
+        drawCDFan(iconX, iconY, iconSize, cdFraction);
+
+        // 标题
+        const titleSize = Math.max(24, WIDTH * 0.06);
+        ctx.font = `bold ${titleSize}px "Microsoft YaHei", Arial`;
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.fillText('折磨气纯模拟器v1.6', WIDTH / 2, HEIGHT * 0.25);
+
+        // 提示文字
+        const msgSize = Math.max(16, WIDTH * 0.04);
+        ctx.font = `${msgSize}px "Microsoft YaHei", Arial`;
+        ctx.fillStyle = '#dcdcdc';
+        ctx.fillText(message, WIDTH / 2, HEIGHT * 0.36);
+
+//           // 上一轮成绩
+//            if (lastReactionMs !== null) {
+//               const smallSize = Math.max(12, WIDTH * 0.03);
+//                ctx.font = `${smallSize}px "Microsoft YaHei", Arial`;
+//               ctx.fillStyle = '#9fd9ff';
+//                ctx.fillText(`上一轮反应: ${Math.round(lastReactionMs)} ms`, WIDTH / 2, HEIGHT * 0.40);
+//            }
+
+        // 进度条背景
+        ctx.fillStyle = '#505050';
+        const barX = (WIDTH - BAR_WIDTH_MAX) / 2;
+        const barY = HEIGHT * 0.47;
+        const barWidth  = Math.min(BAR_WIDTH_MAX, WIDTH * 0.8);
+        const barHeight = Math.max(20, HEIGHT * 0.08);
+        drawRoundedRect(barX - (barWidth - BAR_WIDTH_MAX) / 2, barY, barWidth, barHeight, 8);
+
+        // 进度条填充
+        let drawFrac = barFraction;
+        if (barFadeActive) {
+            drawFrac = barHitFraction;
+        }
+        if (drawFrac > 0) {
+            ctx.fillStyle = `rgba(${barRgb}, ${barAlpha})`;
+            const fillWidth = barWidth * drawFrac;
+            drawRoundedRect(
+                barX - (barWidth - BAR_WIDTH_MAX) / 2,
+                barY,
+                fillWidth,
+                barHeight,
+                8
+            );
+        }
+
+        // 当前反应时间
+        let text;
+        if (state === "RESULT") {
+            if (reactionTime !== null) {
+                text = `本次反应时间：${(reactionTime * 1000).toFixed(1)} ms`;
+            } else {
+                text = `本次反应时间：> ${(BAR_DURATION * 1000).toFixed(0)} ms (超时)`;
+            }
+        } else if (state === "TOO_EARLY") {
+            text = "断空了，小笨蛋！";
+        } else {
+            text = "本次反应时间：-- ms";
+        }
+
+        const resultSize = Math.max(16, WIDTH * 0.04);
+        ctx.font = `${resultSize}px "Microsoft YaHei", Arial`;
+        ctx.fillStyle = '#ffff00';
+        ctx.fillText(text, WIDTH / 2, HEIGHT * 0.85);
+    }
+
+    /* ========== 主循环 ========== */
+
+    function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    // /* ========== 排行榜按钮绑定 ========== */
+
+    // try {
+    //     const lbBtn    = document.getElementById('leaderboardBtn');
+    //     const closeBtn = document.getElementById('closeLeaderboardBtn');
+    //     const saveBtn  = document.getElementById('saveScoreBtn');
+    //     const clearBtn = document.getElementById('clearLeaderboardBtn');
+    //     const nameInput = document.getElementById('playerNameInput');
+
+    //     if (lbBtn)   lbBtn.addEventListener('click', showLeaderboardOverlay);
+    //     if (closeBtn) closeBtn.addEventListener('click', hideLeaderboardOverlay);
+    //     if (clearBtn) clearBtn.addEventListener('click', () => {
+    //         localStorage.removeItem(LEADERBOARD_KEY);
+    //         renderLeaderboard();
+    //     });
+
+    //     if (saveBtn && nameInput) {
+    //         saveBtn.addEventListener('click', () => {
+    //             const nm = nameInput.value ? nameInput.value.trim().slice(0,20) : '匿名';
+    //             const labelText = document.getElementById('currentTimeLabel').textContent || '';
+    //             const m = labelText.match(/([0-9]+)\s*ms/);
+    //             if (!m) {
+    //                 alert('没有有效成绩，无法保存');
+    //                 return;
+    //             }
+    //             const timeMs = parseInt(m[1], 10);
+
+    //             const list = loadLeaderboard();
+    //             const entryObj = {
+    //                 name: nm,
+    //                 time: timeMs,
+    //                 at: new Date().toISOString()
+    //             };
+    //             list.push(entryObj);
+    //             list.sort((a,b) => a.time - b.time);
+    //             const sliced = list.slice(0, LEADERBOARD_MAX);
+    //             saveLeaderboard(sliced);
+    //             renderLeaderboard(entryObj);
+    //         });
+
+    //         nameInput.addEventListener('keydown', (e) => {
+    //             if (e.key === 'Enter') {
+    //                 e.preventDefault();
+    //                 saveBtn.click();
+    //             }
+    //         });
+    //     }
+    // } catch (e) {
+    //     console.warn('排行榜事件绑定失败', e);
+    // }
+    try {
+        // const lbBtn = document.getElementById('leaderboardBtn');
+        // const closeBtn = document.getElementById('closeLeaderboardBtn');
+        // const saveBtn = document.getElementById('saveScoreBtn');
+        // const clearBtn = document.getElementById('clearLeaderboardBtn');
+        // const nameInput = document.getElementById('playerNameInput');
+
+
+        // === 新增：职业按钮事件 ===
+        const jobButtons = document.querySelectorAll('.job-btn');
+
+        jobButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const jobKey = btn.getAttribute('data-job');
+                if (!JOBS[jobKey]) return;
+
+                // 只允许在 IDLE/RESULT/TOO_EARLY 状态切职业
+                if (state !== 'IDLE' && state !== 'RESULT' && state !== 'TOO_EARLY') {
+                    message = '战斗中不能换职业哦~';
+                    return;
+                }
+
+                currentJobKey = jobKey;
+                currentJob = JOBS[jobKey];
+                bladeflyCD = currentJob.cd;
+
+                updateIconByJob(); // 换 skill 图标
+
+                // 按钮高亮
+                jobButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                message = `已切换为 ${currentJob.name}，点击屏幕开始！`;
+            });
+        });
+
+        // 默认选中当前职业按钮
+        document.querySelector(`.job-btn[data-job="${currentJobKey}"]`)?.classList.add('active');
+
+    } catch (e) {
+        console.warn('事件绑定失败', e);
+    }
+
+    gameLoop();

@@ -155,6 +155,7 @@
     </style>
 </head>
 <body>
+    #region
     <div class="container">
         <!-- 新增：职业选择 -->
         <div class="job-select">
@@ -197,7 +198,7 @@
         const ctx = canvas.getContext('2d');
 
 
-        // ===== 职业配置 =====
+// #region ========== 职业配置 ========== 
         // 每个职业可以指定：图标、条读音效、技能音效、结束音效、CD
         const JOBS = {
             Blade: {
@@ -223,8 +224,9 @@
         // 当前职业
         let currentJobKey = 'Blade';
         let currentJob = JOBS[currentJobKey];
+// #endregion    
 
-        /* ========== 音效系统 ========== */
+// #region ========== 音效系统 ========== 
 
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const soundBuffers = {};
@@ -245,7 +247,7 @@
         }
 
         // 上层音效函数
-        // 播放循环音效函数
+        // 播放读条音效（循环）
         function playBarLoop() {
             stopSound(currentBarSource);
             if (!currentJob.barSound) return;
@@ -312,40 +314,41 @@
 
         let currentBarSource = null;
         let currentSkillSource = null;
+// #endregion
 
-        /* ========== 图片资源 ========== */
-
-        let iconLoaded = false;
+// #region ========== 图片资源 ========== 
+        
         let logoLoaded = false;
-        // let iconImg = new Image();
         let logoImg = new Image();
-
-        // iconImg.onload = () => { iconLoaded = true; };
-        // iconImg.onerror = () => { console.warn('图标加载失败，请检查路径'); };
-        // iconImg.src = 'icon.png';
-
-        function updateIconByJob() {
-            if (!iconImg) return;
-            iconLoaded = false;
-            iconImg.src = currentJob.icon;
-        }
-
-        // 初始化
-        iconImg = new Image();
-        iconImg.onload = () => { 
-            iconLoaded = true;
-            console.log('图标加载成功'); 
-        };
-        iconImg.onerror = () => { 
-            console.warn('图标加载失败，请检查路径'); 
-        };
-
-        // 初始职业图标
-        updateIconByJob();
 
         logoImg.onload = () => { logoLoaded = true; };
         logoImg.onerror = () => { console.warn('Logo加载失败，请检查路径'); };
         logoImg.src = 'logo.png';
+
+
+        // 更新 当前技能图标（函数）
+        function updateSkillIconByJob() {
+            if (!SkillImg) return;
+            SkillIconLoaded = false;
+            SkillImg.src = currentJob.icon;
+        }
+
+        // 初始化 当前技能图标
+        let SkillIconLoaded = false;
+        SkillImg = new Image();
+        SkillImg.onload = () => { 
+            SkillIconLoaded = true;
+            console.log('图标加载成功'); 
+        };
+        SkillImg.onerror = () => { 
+            console.warn('图标加载失败，请检查路径'); 
+        };
+
+        // 更新 技能图标
+        updateSkillIconByJob();
+// #endregion
+
+// #region ========== 基本常量与画布 ========== 
 
         /* ========== 基本常量与画布 ========== */
 
@@ -353,9 +356,15 @@
         let HEIGHT = 450;
 
         const BAR_DURATION = 0.56;   // 读条总时长（秒）
-        const BAR_WIDTH_MAX = 600;
+        const BAR_WIDTH_MAX = 600;   // 进度条最大宽度（像素）
         const BLADEFLY_CD   = 3.0;   // 技能冷却时间（秒）
 
+        // 图标位置（实际在 draw 中每帧按窗口更新）
+        let iconSize = Math.min(WIDTH * 0.15, 100);
+        let iconX = (WIDTH - iconSize) / 2;
+        let iconY = HEIGHT * 0.62;
+
+        // 画布自适应
         function resizeCanvas() {
             const rect = canvas.getBoundingClientRect();
             const dpr = window.devicePixelRatio || 1;
@@ -375,7 +384,21 @@
             setTimeout(resizeCanvas, 100);
         });
 
-        /* ========== 游戏状态机 ========== */
+        // 进度条颜色 & 淡出控制
+        const BAR_COLOR_NORMAL = '0,180,90';   // 绿色
+        const BAR_COLOR_HIT    = '255,64,64';  // 红色
+
+        let barRgb = BAR_COLOR_NORMAL;
+        let barAlpha = 1.0;
+
+        let barFadeActive = false;
+        let barFadeStartTime = 0;
+        const BAR_FADE_DURATION = 0.4;        // 红条淡出时长
+
+        let barHitFraction = 0.0;             // 命中瞬间的条长
+//#endregion
+
+// #region ========== 游戏状态机 ========== */
 
         let state = "IDLE";              // IDLE / PREPARE / RUNNING / TOO_EARLY / SAFE RUNNING / RESULT
         let waitUntil = null;            // PREPARE / TOO_EARLY 等待到的时间点
@@ -390,23 +413,6 @@
 
         let message = "有本事断我看看？~ 点击屏幕开始";
 
-        // 进度条颜色 & 淡出控制
-        const BAR_COLOR_NORMAL = '0,180,90';   // 绿色
-        const BAR_COLOR_HIT    = '255,64,64';  // 红色
-
-        let barRgb = BAR_COLOR_NORMAL;
-        let barAlpha = 1.0;
-
-        let barFadeActive = false;
-        let barFadeStartTime = 0;
-        const BAR_FADE_DURATION = 0.4;        // 红条淡出时长
-
-        let barHitFraction = 0.0;             // 命中瞬间的条长
-
-        // 图标位置（实际在 draw 中每帧按窗口更新）
-        let iconSize = Math.min(WIDTH * 0.15, 100);
-        let iconX = (WIDTH - iconSize) / 2;
-        let iconY = HEIGHT * 0.62;
 
         /* ========== 排行榜（localStorage） ========== */
 
@@ -494,8 +500,9 @@
             setTimeout(() => { input.focus(); input.select(); }, 100);
             renderLeaderboard();
         }
-
-        /* ========== 输入事件（统一走 handleSpaceKey） ========== */
+//#endregion
+        
+//#region /* ========== 输入事件（统一走 handleSpaceKey） ========== */
 
         let touchStartTime = 0;
         const LONG_PRESS_TIME = 1000; // 1秒长按退出
@@ -595,8 +602,10 @@
                 // 已经被判抢跑，不再允许通过按键“赚”反应时间
             }
         }
+//#endregion
 
-        /* ========== 逻辑更新 ========== */
+
+//#region ========== 逻辑更新 ========== */
 
         function update() {
             const now = performance.now() / 1000;
@@ -692,8 +701,9 @@
                 barAlpha = 1.0;
             }
         }
+//#endregion
 
-        /* ========== 绘制 ========== */
+//#region  ========== 绘制 ========== */
 
         function drawCDFan(x, y, size, fraction) {
             if (fraction <= 0) return;
@@ -788,9 +798,9 @@
             }
 
             // Icon
-            if (iconLoaded && iconImg) {
+            if (SkillIconLoaded && SkillImg) {
                 try {
-                    ctx.drawImage(iconImg, iconX, iconY, iconSize, iconSize);
+                    ctx.drawImage(SkillImg, iconX, iconY, iconSize, iconSize);
                 } catch (e) {
                     ctx.fillStyle = '#4a6fa5';
                     ctx.fillRect(iconX, iconY, iconSize, iconSize);
@@ -881,8 +891,10 @@
             ctx.fillStyle = '#ffff00';
             ctx.fillText(text, WIDTH / 2, HEIGHT * 0.85);
         }
+//#endregion
+ 
 
-        /* ========== 主循环 ========== */
+//#region /* ========== 主循环 ========== */
 
         function gameLoop() {
             update();
@@ -966,7 +978,7 @@
                     currentJob = JOBS[jobKey];
                     bladeflyCD = currentJob.cd;
 
-                    updateIconByJob(); // 换 skill 图标
+                    updateSkillIconByJob(); // 换 skill 图标
 
                     // 按钮高亮
                     jobButtons.forEach(b => b.classList.remove('active'));
@@ -984,6 +996,7 @@
         }
 
         gameLoop();
+        //#endregion
     </script>
 </body>
 </html>
