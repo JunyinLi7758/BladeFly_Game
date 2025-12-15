@@ -1,0 +1,198 @@
+/* ========== 全局重置 / 交互禁用 ========== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* ========== 页面基础 ========== */
+html, body {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+  font-family: "Microsoft YaHei", Arial, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* ========== 容器 / 画布 ========== */
+.container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #1e1e1e;
+  position: relative;
+}
+
+canvas {
+  display: block;
+  background: #1e1e1e;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+/* ========== 底部信息条 ========== */
+.info {
+  position: fixed;
+  bottom: 10px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  padding: 10px;
+  background: rgba(45, 45, 45, 0.8);
+  color: #aaa;
+  font-size: 12px;
+  z-index: 10;
+}
+
+/* ========== 排行榜按钮 ========== */
+#leaderboardBtn {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 20;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* ========== Overlay / Modal ========== */
+.overlay {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.overlay .modal {
+  background: #1f1f1f;
+  color: #ddd;
+  padding: 18px;
+  border-radius: 10px;
+  width: min(720px, 92%);
+  max-height: 86%;
+  overflow: auto;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+}
+
+.overlay h3 {
+  margin-bottom: 8px;
+}
+
+/* ========== 职业选择按钮组 ========== */
+.job-select {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 20;
+  display: flex;
+  gap: 6px;
+  background: rgba(0,0,0,0.5);
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.job-btn {
+  border: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #444;
+  color: #fff;
+}
+
+.job-btn.active {
+  background: #00b45a;
+  color: #fff;
+}
+
+/* ========== 排行榜列表与控件 ========== */
+.leaderboard-list {
+  margin-top: 8px;
+}
+
+.leaderboard-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.leaderboard-item.highlight {
+  background: rgba(0,180,90,0.08);
+}
+
+.leaderboard-controls {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.leaderboard-controls input {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #333;
+  background: #101010;
+  color: #fff;
+}
+
+.leaderboard-controls button {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+}
+
+/* ========== 响应式设计 ========== */
+@media (max-width: 768px) {
+  .info {
+    font-size: 11px;
+    padding: 8px;
+  }
+}
+
+.back-btn {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 40;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.back-btn:hover {
+  background: rgba(0,0,0,0.8);
+}

@@ -1,200 +1,207 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <link rel="icon" href="icon.ico" type="image/x-icon">
-    <!-- Privacy-friendly analytics by Plausible -->
-    <script async src="https://plausible.io/js/pa-BePX5Db1IkvdLNb1gswBS.js"></script>
-    <script>
-      window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},
-      plausible.init=plausible.init||function(i){plausible.o=i||{}};
-      plausible.init();
-    </script>
+  <meta charset="UTF-8" />
+  <title>剑飞生太极模拟器 · 模式选择</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>试试飞我的太极！v1.6</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-user-select: none;
-            user-select: none;
-            -webkit-touch-callout: none;
-        }
-        
-        html, body {
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
-            font-family: "Microsoft YaHei", Arial, sans-serif;
-        }
-        
-        body {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-            padding: 0;
-        }
-        
-        .container {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            background: #1e1e1e;
-            position: relative;
-        }
-        
-        canvas {
-            display: block;
-            background: #1e1e1e;
-            width: 100%;
-            height: 100%;
-            touch-action: none;
-        }
-        
-        .info {
-            position: fixed;
-            bottom: 10px;
-            left: 0;
-            right: 0;
-            text-align: center;
-            padding: 10px;
-            background: rgba(45, 45, 45, 0.8);
-            color: #aaa;
-            font-size: 12px;
-            z-index: 10;
-        }
+  <style>
+    * {
+      box-sizing: border-box;
+    }
 
-        /* 排行榜样式 */
-        #leaderboardBtn {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            z-index: 20;
-            background: rgba(0,0,0,0.6);
-            color: #fff;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-        }
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #1e1e1e 0%, #2b2b2b 100%);
+      font-family: "Microsoft YaHei", Arial, sans-serif;
+      color: #eee;
+    }
 
-        .overlay {
-            position: fixed;
-            left: 0;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 30;
-        }
+    .menu-wrapper {
+      text-align: center;
+      max-width: 420px;
+      width: 90%;
+    }
 
-        .overlay.hidden { display: none; }
+    /* ===== 标题区 ===== */
+    .title {
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      letter-spacing: 1px;
+    }
 
-        .overlay .modal {
-            background: #1f1f1f;
-            color: #ddd;
-            padding: 18px;
-            border-radius: 10px;
-            width: min(720px, 92%);
-            max-height: 86%;
-            overflow: auto;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.6);
-        }
-        .job-select {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            z-index: 20;
-            display: flex;
-            gap: 6px;
-            background: rgba(0,0,0,0.5);
-            padding: 6px 8px;
-            border-radius: 8px;
-        }
+    .subtitle {
+      font-size: 14px;
+      color: #aaa;
+      margin-bottom: 28px;
+    }
 
-        .job-btn {
-            border: none;
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 12px;
-            cursor: pointer;
-            background: #444;
-            color: #fff;
-        }
+    /* ===== 模式卡片 ===== */
+    .menu {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
 
-        .job-btn.active {
-            background: #00b45a;
-            color: #fff;
-        }
+    .mode-card {
+      background: rgba(0, 0, 0, 0.45);
+      border-radius: 12px;
+      padding: 18px 20px;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
 
+    .mode-card:hover {
+      background: rgba(255,255,255,0.06);
+      transform: translateY(-2px);
+    }
 
-        .overlay h3 { margin-bottom: 8px; }
-        .leaderboard-list { margin-top: 8px; }
-        .leaderboard-item { display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
-        .leaderboard-item.highlight { background: rgba(0,180,90,0.08); }
-        .leaderboard-controls { margin-top: 12px; display:flex; gap:8px; }
-        .leaderboard-controls input { flex:1; padding:6px 8px; border-radius:6px; border:1px solid #333; background:#101010; color:#fff }
-        .leaderboard-controls button { padding:6px 10px; border-radius:6px; border:none; cursor:pointer; }
+    .mode-title {
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: 4px;
+      color: #fff;
+    }
 
-        /* 响应式设计 */
-        @media (max-width: 768px) {
-            .info {
-                font-size: 11px;
-                padding: 8px;
-            }
-        }
-    </style>
+    .mode-desc {
+      font-size: 13px;
+      color: #bbb;
+      line-height: 1.4;
+    }
+
+    /* ===== 轻微区分两种模式 ===== */
+    .mode-card.primary {
+      border-left: 4px solid #4a6fa5;
+    }
+
+    .mode-card.secondary {
+      border-left: 4px solid #00b45a;
+    }
+
+    /* ===== 移动端适配 ===== */
+    @media (max-width: 480px) {
+      .title {
+        font-size: 24px;
+      }
+      .mode-title {
+        font-size: 16px;
+      }
+    }
+    .mode-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 12px;
+  padding: 16px 18px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.mode-card:hover {
+  background: rgba(255,255,255,0.06);
+  transform: translateY(-2px);
+}
+
+/* 左侧图标容器 */
+.mode-icon-wrap {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+}
+
+/* 图标本体 */
+.mode-icon-wrap img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+/* 右侧文字区域 */
+.mode-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* 标题 */
+.mode-title {
+  font-size: 18px;
+  font-weight: 500;
+  color: #fff;
+}
+
+/* 描述 */
+.mode-desc {
+  font-size: 13px;
+  color: #bbb;
+  line-height: 1.4;
+}
+
+/* 不同模式的强调色 */
+.mode-card.primary {
+  border-left: 4px solid #4a6fa5;
+}
+
+.mode-card.secondary {
+  border-left: 4px solid #00b45a;
+}
+
+/* hover 时图标轻微反馈（可选） */
+.mode-card:hover .mode-icon-wrap {
+  background: rgba(255,255,255,0.12);
+}
+
+  </style>
 </head>
+
 <body>
-    #region
-    <div class="container">
-        <!-- 新增：职业选择 -->
-        <div class="job-select">
-            <button class="job-btn" data-job="Blade">剑纯</button>
-            <button class="job-btn" data-job="Flower">万花</button>
-            <button class="job-btn" data-job="Toxic">五毒</button>
-        </div>
+  <div class="menu-wrapper">
+    <div class="title">剑飞生太极模拟器</div>
+    <div class="subtitle">选择你要体验的模式</div>
 
-        <canvas id="gameCanvas"></canvas>
-        <button id="leaderboardBtn">排行榜(捣鼓中)</button>
-
-        <div id="leaderboardOverlay" class="overlay hidden" aria-hidden="true">
-            <div class="modal" role="dialog" aria-modal="true">
-                <h3>排行榜</h3>
-                <div id="leaderboardContent">
-                    <div class="leaderboard-list" id="leaderboardList">
-                        <!-- 列表由 JS 渲染 -->
-                    </div>
-                </div>
-
-                <div style="margin-top:10px;color:#bbb;font-size:13px;">
-                    你的成绩：<span id="currentTimeLabel">--</span>
-                </div>
-
-                <div class="leaderboard-controls">
-                    <input id="playerNameInput" placeholder="输入你的名字（最多 20 字）" maxlength="20" />
-                    <button id="saveScoreBtn" style="background:#00b45a;color:#fff">保存</button>
-                    <button id="closeLeaderboardBtn" style="background:#555;color:#fff">关闭</button>
-                    <button id="clearLeaderboardBtn" style="background:#a33;color:#fff">清空</button>
-                </div>
-            </div>
-        </div>
-        <div class="info">
-            点击屏幕开始 | By 纵月-李凌安 <br> 希望大家玩的开心~  <br> BUG反馈 QQ:670191833
-        </div>
+    <div class="menu">
+<div class="mode-card primary" onclick="location.href='BladeFly.html'">
+  <div class="mode-icon-wrap">
+    <img src="icon_blade.png" alt="折磨气纯">
+  </div>
+  <div class="mode-text">
+    <div class="mode-title">折磨气纯</div>
+    <div class="mode-desc">
+      经典断条练习模式，考验你的反应速度与稳定度。
     </div>
+  </div>
+</div>
 
-<!-- <script type="module" src="./game_breakbar.js"></script> -->
-<script type="module" src="./game_selfbreak.js"></script>
+<div class="mode-card secondary" onclick="location.href='SelfBreak.html'">
+  <div class="mode-icon-wrap">
+    <img src="logo.png" alt="欺骗剑纯">
+  </div>
+  <div class="mode-text">
+    <div class="mode-title">欺骗剑纯</div>
+    <div class="mode-desc">
+      高阶骗断博弈模式，诱导对手出手，在 CD 中完成读条。
+    </div>
+  </div>
+</div>
+
+    </div>
+  </div>
 </body>
 </html>
-

@@ -1,0 +1,66 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <link rel="icon" href="icon.ico" type="image/x-icon">
+    <!-- Privacy-friendly analytics by Plausible -->
+    <script async src="https://plausible.io/js/pa-BePX5Db1IkvdLNb1gswBS.js"></script>
+    <script>
+      window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},
+      plausible.init=plausible.init||function(i){plausible.o=i||{}};
+      plausible.init();
+    </script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>试试飞我的太极！v1.6</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="container">
+
+        <!-- 新增：职业选择 -->
+        <div class="job-select">
+              <button class="job-btn" onclick="location.href='index.html'">
+    ← 模式
+  </button>
+            <button class="job-btn" data-job="Blade">剑纯</button>
+            <button class="job-btn" data-job="Flower">万花</button>
+            <button class="job-btn" data-job="Toxic">五毒</button>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+        <button id="leaderboardBtn">排行榜(捣鼓中)</button>
+
+        <div id="leaderboardOverlay" class="overlay hidden" aria-hidden="true">
+            <div class="modal" role="dialog" aria-modal="true">
+                <h3>排行榜</h3>
+                <div id="leaderboardContent">
+                    <div class="leaderboard-list" id="leaderboardList">
+                        <!-- 列表由 JS 渲染 -->
+                    </div>
+                </div>
+
+                <div style="margin-top:10px;color:#bbb;font-size:13px;">
+                    你的成绩：<span id="currentTimeLabel">--</span>
+                </div>
+
+                <div class="leaderboard-controls">
+                    <input id="playerNameInput" placeholder="输入你的名字（最多 20 字）" maxlength="20" />
+                    <button id="saveScoreBtn" style="background:#00b45a;color:#fff">保存</button>
+                    <button id="closeLeaderboardBtn" style="background:#555;color:#fff">关闭</button>
+                    <button id="clearLeaderboardBtn" style="background:#a33;color:#fff">清空</button>
+                </div>
+            </div>
+        </div>
+        <div class="info">
+            点击屏幕开始 | By 纵月-李凌安 <br> 希望大家玩的开心~  <br> BUG反馈 QQ:670191833
+        </div>
+    </div>
+
+<script type="module" src="./game_breakbar.js"></script>
+<!-- <script type="module" src="./game_selfbreak.js"></script> -->
+</body>
+</html>
+
