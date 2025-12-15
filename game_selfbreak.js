@@ -127,6 +127,9 @@ let enemyReactSec = null;      // 敌方反应时间（秒）
 let enemyInterruptAt = null;   // 敌方计划打断的绝对时间（秒）
 
 let currentSkillSource = null;
+let currentBarSource = null;
+
+let BLADEFLY_CD = 3.0; // 敌方CD时间（可独立设置）
 // 进度条颜色控制沿用你原来的
 // barRgb / barAlpha / barFadeActive / barHitFraction ...
 
@@ -211,11 +214,15 @@ async function handleAction() {
   // await unlockAudio();
 
   const enemyOnCd = (enemyCdEndTime !== null && now < enemyCdEndTime);
+  console.log("当前状态:", state, "敌方CD中:", enemyOnCd);
 
   // RESULT / READY：开始读条
   if (state === "READY" || state === "RESULT") {
+    if (state === "RESULT" && enemyOnCd) {
+        return; // 结果状态下敌方在CD不允许重开
+    }
     // 重置条显示
-    playSkillOnce();
+    // playSkillOnce();
     barRgb = BAR_COLOR_NORMAL;
     barAlpha = 1.0;
     barFadeActive = false;
@@ -224,59 +231,54 @@ async function handleAction() {
     reactionTime = null;
     barFraction = 0.0;
     startTime = now;
+    console.log("读条开始时间设为", startTime);
 
     // 如果敌方不在CD：生成“断点+反应时间+打断时刻”
     if (!enemyOnCd) {
-      enemyBreakFrac = Math.random() * 0.5 + 0.35;      // 0.35~0.85
-      enemyReactSec  = Math.random() * 0.15 + 0.10;     // 0.10~0.25s
-      enemyInterruptAt = startTime + enemyBreakFrac * BAR_DURATION + enemyReactSec;
+      enemyBreakFrac = Math.random() * 0.9 - 0.1;      // 0.35~0.85
+      
+      enemyReactSec  = Math.random() * 0.0 + 0.1;     // 0.10~0.25s
       message = "开始读条… 小心别在断点后还在读！";
+      enemyInterruptAt = null; // 重置打断时刻，由 update 计算
     } else {
       enemyBreakFrac = null;
       enemyReactSec = null;
       enemyInterruptAt = null;
       message = "敌方在CD！稳稳读完就赢。";
     }
+    
+    state = "CASTING";
+    // 播放读条音效（可选）
+    stopSound(currentBarSource); currentBarSource = playSound('bar', false);
+    return;
+  }
+  else if (state === "PAUSE") {
+      // playSkillOnce();
+    barRgb = BAR_COLOR_NORMAL;
+    barAlpha = 1.0;
+    barFadeActive = false;
+    barHitFraction = 0;
+
+    reactionTime = null;
+    barFraction = 0.0;
+    startTime = now;
+    
 
     state = "CASTING";
     // 播放读条音效（可选）
-    // stopSound(currentBarSource); currentBarSource = playSound('bar', false);
-    return;
-  }
-
+    stopSound(currentBarSource); currentBarSource = playSound('bar', false);
+    return;  
+    }
   // CASTING：点击=取消读条（骗断）
-  if (state === "CASTING") {
+
+  else if (state === "CASTING") {
     // 取消读条：进度归零（也可以保留显示，但更像“停手”就归零）
     barFraction = 0.0;
-    startTime = null;
+    // startTime = null;
 
     message = "你停手了… 等它按原计划打断（打空）进入CD！";
-    state = "READY";
+    state = "PAUSE";
     return;
-  }
-
-  // BAITING：如果敌方已经进入CD了，允许你开始读条（否则重开等于送断）
-  if (state === "BAITING") {
-    if (enemyOnCd) {
-      // 同 READY 开条，但这次敌方在CD -> 不会生成 interruptAt
-      barRgb = BAR_COLOR_NORMAL;
-      barAlpha = 1.0;
-      barFadeActive = false;
-      barHitFraction = 0;
-
-      reactionTime = null;
-      barFraction = 0.0;
-      startTime = now;
-
-      enemyBreakFrac = null;
-      enemyReactSec = null;
-      enemyInterruptAt = null;
-
-      message = "它CD里！快读完！";
-      state = "CASTING";
-    } else {
-      message = "别急，现在重开会被直接断。等它先打空！";
-    }
   }
 }
 
@@ -287,12 +289,14 @@ async function handleAction() {
 // #region ========== 6) 逻辑更新（update：推进状态机/读条/自断/超时/淡出） ==========
 function update() {
   const now = performance.now() / 1000;
+//   console.log("当前状态:", startTime) ;
 
   const enemyOnCd = (enemyCdEndTime !== null && now < enemyCdEndTime);
 
   // CASTING：推进读条
-  if (state === "CASTING") {
+  if (state === "CASTING" ) {
     const elapsed = now - startTime;
+
     let frac = elapsed / BAR_DURATION;
 
     // 读满：成功
@@ -303,18 +307,24 @@ function update() {
       reactionTime = elapsed; // 成功用时
       message = "读条成功！你赢了。点一下再来。";
       state = "RESULT";
-      // stopSound(currentBarSource); currentBarSource=null;
-    } else {
+      stopSound(currentBarSource); currentBarSource=null;
+      playSound('finish', false);
+    } else if (enemyInterruptAt == null && frac >= enemyBreakFrac && !enemyOnCd) {
+        enemyInterruptAt = enemyBreakFrac * BAR_DURATION + enemyReactSec;
+        // console.log(now,startTime,"敌方计划打断时刻设为", enemyInterruptAt);
+    }else {
       barFraction = frac;
 
       // 敌方不在CD，且到了计划打断时刻：如果你还在读条 -> 失败并进入敌方CD
-      if (!enemyOnCd && enemyInterruptAt !== null && now >= enemyInterruptAt) {
+      if (!enemyOnCd && enemyInterruptAt !== null && elapsed >= enemyInterruptAt) {
         // 敌方成功打断你
-        reactionTime = elapsed; // 被断时刻（用于显示）
+        playSkillOnce();
 
         // 进入敌方CD
         enemyCdEndTime = now + BLADEFLY_CD; // 你也可以单独设 ENEMY_CD
         enemyInterruptAt = null;
+
+        reactionTime = elapsed; // 被断时刻（用于显示）
 
         // 红条提示（表示“你被断了”）
         barHitFraction = Math.max(0, Math.min(1, barFraction));
@@ -328,23 +338,19 @@ function update() {
         // playSound('skill_xxx') 可选
       }
     }
+  } else if (state === "PAUSE"){
+    const elapsed = now - startTime;
+    console.log("暂停状态，已过时长:", elapsed, startTime, now);
+    if (enemyInterruptAt !== null && elapsed >= enemyInterruptAt) {
+        playSkillOnce();
+        enemyCdEndTime = now + BLADEFLY_CD; // 你也可以单独设 ENEMY_CD
+        enemyInterruptAt = null;
+    }
+    // 暂停状态下不推进读条
+    barFraction = 0.0;
   }
-
-//   // BAITING：你停手等待敌方按原计划打断，如果此刻你没在读条 -> 它打空进入CD
-//   if (state === "BAITING") {
-//     if (!enemyOnCd && enemyInterruptAt !== null && now >= enemyInterruptAt) {
-//       // 敌方打断打空
-//       enemyCdEndTime = now + BLADEFLY_CD;  // 或 ENEMY_CD
-//       enemyInterruptAt = null;
-
-//       message = "它断空了！现在它CD里，点一下开始读条！";
-//       state = "READY";
-//       // 这里也可以触发一个“断空”音效
-//     }
-//   }
-
   // READY：提示敌方CD剩余（可选）
-  if (state === "READY") {
+  else if (state === "READY" || state === "RESULT") {
     if (enemyOnCd) {
       const remain = (enemyCdEndTime - now).toFixed(1);
       message = `敌方打断CD：剩余 ${remain}s。点一下开始读条！`;
