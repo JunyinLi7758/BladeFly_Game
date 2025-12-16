@@ -516,12 +516,12 @@ function draw() {
     let text;
     if (state === "RESULT") {
     if (reactionTime !== null) {
-        text = `自断于：${(reactionTime * 1000).toFixed(1)} ms`;
+        text = `被断于：${(reactionTime * 1000).toFixed(1)} ms`;
     } else {
-        text = `自断于：-- ms`;
+        text = `被断于：-- ms`;
     }
     } else {
-    text = "自断于：-- ms";
+    text = "被断于：-- ms";
     }
 
 
