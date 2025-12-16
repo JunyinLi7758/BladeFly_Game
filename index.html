@@ -168,6 +168,42 @@
   background: rgba(255,255,255,0.12);
 }
 
+
+    /* ===== 新增：二维码框样式 ===== */
+    .qrcode-box {
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 10px;
+      padding: 15px 20px;
+      border: 1px solid rgba(255,255,255,0.08);
+      text-align: center;
+    }
+
+    .qrcode-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: #ccc;
+      margin-bottom: 8px;
+    }
+
+    .qrcode-desc {
+      font-size: 12px;
+      color: #999;
+      line-height: 1.4;
+    }
+
+    /* 移动端适配 */
+    @media (max-width: 480px) {
+      .title {
+        font-size: 24px;
+      }
+      .mode-title {
+        font-size: 16px;
+      }
+      .qrcode-box {
+        padding: 12px 16px;
+      }
+    }
+
   </style>
 </head>
 
@@ -201,7 +237,18 @@
   </div>
 </div>
 
+
+    </div>      <div class="qrcode-box">
+      <div class="qrcode-title">补充网页链接二维码</div>
+      <div class="qrcode-desc">
+        <!-- 这里可以放置你的二维码图片 -->
+        <img src="img/QR_code.jpg" alt="二维码" style="max-width: 120px; margin: 5px 0;">
+        <!-- 请将二维码图片替换为你自己的图片 -->
+      </div>
     </div>
   </div>
+  </div>
+
+
 </body>
 </html>
