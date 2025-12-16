@@ -96,7 +96,7 @@ function setJob(jobKey) {
   currentJobKey = jobKey;
   currentJob = JOBS[jobKey];
   setSkillIcon(currentJob.icon);
-  message = `已切换为 ${currentJob.name}，点击屏幕开始！`;
+  message = `长按读条欺骗${currentJob.name}，骗到别忘了生太极！`;
 }
 // #endregion
 
@@ -118,7 +118,8 @@ let startTime = null;          // 本次读条开始时间
 let barFraction = 0.0;         // 0~1
 let reactionTime = null;       // 结果展示用（成功=总用时；失败=被断时刻）
 
-let message = "点一下开始读条，骗断成功就能稳稳读完。";
+let message = `长按读条欺骗${currentJob.name}，骗到别忘了生太极！ `;
+
 
 // 敌方（电脑）行为参数
 let enemyCdEndTime = null;     // 敌方打断技能CD结束时间
@@ -138,38 +139,105 @@ let BLADEFLY_CD = 3.0; // 敌方CD时间（可独立设置）
 
 
 // #region ========== 4) 输入事件（键盘/鼠标/触屏 + 职业按钮） ==========
-let touchStartTime = 0;
+let pressStartTime = 0;
 const LONG_PRESS_TIME = 1000;
+let isPressing = false;
 
-window.addEventListener('keydown', async (e) => {
-  if (e.key === 'Escape') {
-    state = "READY";
-    return;
-  }
-  if (e.key === ' ' || e.key === 'Enter') {
-    e.preventDefault();
-    await handleAction();
-  }
-});
 
-canvas.addEventListener('click', async () => {
-  await handleAction();
-});
+function onPressStart() {
+  if (isPressing) return;
+  isPressing = true;
+  pressStartTime = Date.now();
+  handleAction();
+}
 
-canvas.addEventListener('touchstart', (e) => {
-  e.preventDefault();
-  touchStartTime = Date.now();
-    handleAction();
-});
+async function onPressEnd() {
+  if (!isPressing) return;
+  isPressing = false;
 
-canvas.addEventListener('touchend', async (e) => {
-  e.preventDefault();
-  const touchDuration = Date.now() - touchStartTime;
-  if (touchDuration > LONG_PRESS_TIME) {
+  const duration = Date.now() - pressStartTime;
+
+  if (duration >= LONG_PRESS_TIME) {
     state = "READY";
   } else {
     await handleAction();
   }
+}
+
+
+
+// window.addEventListener('keydown', async (e) => {
+//   if (e.key === 'Escape') {
+//     state = "READY";
+//     return;
+//   }
+//   if (e.key === ' ' || e.key === 'Enter') {
+//     e.preventDefault();
+//     await handleAction();
+//   }
+// });
+
+
+window.addEventListener('keydown', (e) => {
+  if (e.repeat) return; // 防止长按键盘反复触发
+
+  if (e.key === 'Escape') {
+    state = "READY";
+    return;
+  }
+
+  if (e.key === ' ' || e.key === 'Enter') {
+    e.preventDefault();
+    onPressStart();
+  }
+});
+
+window.addEventListener('keyup', async (e) => {
+  if (e.key === ' ' || e.key === 'Enter') {
+    e.preventDefault();
+    await onPressEnd();
+  }
+});
+
+
+// canvas.addEventListener('click', async () => {
+//   await handleAction();
+// });
+
+canvas.addEventListener('mousedown', (e) => {
+  e.preventDefault();
+  onPressStart();
+});
+
+canvas.addEventListener('mouseup', async (e) => {
+  e.preventDefault();
+  await onPressEnd();
+});
+
+// canvas.addEventListener('touchstart', (e) => {
+//   e.preventDefault();
+//   touchStartTime = Date.now();
+//     handleAction();
+// });
+
+// canvas.addEventListener('touchend', async (e) => {
+//   e.preventDefault();
+//   const touchDuration = Date.now() - touchStartTime;
+//   if (touchDuration > LONG_PRESS_TIME) {
+//     state = "READY";
+//   } else {
+//     await handleAction();
+//   }
+// });
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  onPressStart();
+});
+
+canvas.addEventListener('touchend', async (e) => {
+  e.preventDefault();
+  await onPressEnd();
 });
 
 // 职业按钮绑定
@@ -314,7 +382,7 @@ function update() {
       barFraction = frac;
 
     //   reactionTime = elapsed; // 成功用时
-      message = "牛逼，你读条成功了！点一下重开。";
+      message = `牛逼，你骗到${currentJob.name}了！点一下重开。`;
       state = "RESULT";
       stopSound(currentBarSource); currentBarSource=null;
       playSound('finish', false);
@@ -342,7 +410,7 @@ function update() {
         barFadeActive = true;
         barFadeStartTime = now;
 
-        message = `被飞了吧！ 等${currentJob.skillname}转完，重新再来过吧~`;
+        message = `想骗${currentJob.name}？  等${currentJob.skillname.slice(0,2)}好了，重新再来吧~`;
         state = "RESULT";
         // playSound('skill_xxx') 可选
       }
@@ -365,7 +433,8 @@ function update() {
     //   message = `被飞了吧！ 重新试着骗吧~ `;
     }
     else{
-        message = `重新开始吧，点一下开始读条！`;
+        message = `再骗一次试试，长按开始读条！`;
+        // message = "牛逼，你读条成功了！点一下重开。";
         state = "READY";
     }
   }
@@ -505,7 +574,7 @@ function draw() {
   ctx.font = `bold ${titleSize}px "Microsoft YaHei", Arial`;
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
-  ctx.fillText('欺骗剑纯模拟器v1.0', WIDTH / 2, HEIGHT * 0.25);
+  ctx.fillText('欺骗剑纯模拟器v1.1', WIDTH / 2, HEIGHT * 0.25);
 
   // message
   ctx.font = `${msgSize}px "Microsoft YaHei", Arial`;
