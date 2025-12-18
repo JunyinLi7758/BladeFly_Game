@@ -374,7 +374,7 @@ function update() {
 //   console.log("当前状态:", startTime) ;
 
   const enemyOnCd = (enemyCdEndTime !== null && now < enemyCdEndTime);
-
+  
   // CASTING：推进读条
   if (state === "CASTING" ) {
     const elapsed = now - startTime;
@@ -569,7 +569,7 @@ function draw() {
     if (cdRemaining > 0) {
         skillcdFraction = cdRemaining / BLADEFLY_CD; // 或 ENEMY_CD
     } else {
-        cdFraction = 0.0;
+        skillcdFraction = 0.0;
         enemyCdEndTime = null;
     }
     }
@@ -596,7 +596,7 @@ function draw() {
     }
     let logoWidth = logoHeight * (Assets.logoImg ? (Assets.logoImg.width / Assets.logoImg.height) : 4);
     let logoX =(WIDTH - logoWidth) / 2;
-  let logoY = HEIGHT * 0.05;
+    let logoY = HEIGHT * 0.05;
     drawCDFan(logoX, logoY, logoHeight, taichicdFraction);
 
   // 标题
