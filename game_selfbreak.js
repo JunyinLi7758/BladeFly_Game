@@ -131,6 +131,9 @@ let currentSkillSource = null;
 let currentBarSource = null;
 
 let BLADEFLY_CD = 3.0; // 敌方CD时间（可独立设置）
+
+let TAICHI_LAST_TIME = 5.0; // 生太极持续时间（秒）
+let taichiendtime = null;
 // 进度条颜色控制沿用你原来的
 // barRgb / barAlpha / barFadeActive / barHitFraction ...
 
@@ -300,6 +303,8 @@ async function handleAction() {
     // reactionTime = null;
     barFraction = 0.0;
     startTime = now;
+
+    taichiendtime = TAICHI_LAST_TIME + startTime;
     // console.log("读条开始时间设为", startTime);
 
     // 如果敌方不在CD：生成“断点+反应时间+打断时刻”
@@ -558,17 +563,41 @@ function draw() {
   }
 
   // CD 扇形（用当前职业 CD）
-    let cdFraction = 0.0;
+    let skillcdFraction = 0.0;
     if (enemyCdEndTime !== null) {
     const cdRemaining = enemyCdEndTime - now;
     if (cdRemaining > 0) {
-        cdFraction = cdRemaining / BLADEFLY_CD; // 或 ENEMY_CD
+        skillcdFraction = cdRemaining / BLADEFLY_CD; // 或 ENEMY_CD
     } else {
         cdFraction = 0.0;
         enemyCdEndTime = null;
     }
     }
-    drawCDFan(iconX, iconY, iconSize, cdFraction);
+    drawCDFan(iconX, iconY, iconSize, skillcdFraction);
+
+    // CD 扇形（用当前职业 CD）
+    // let taichicdFraction = 0.5;
+    // if (enemyCdEndTime !== null) {
+    // const cdRemaining = enemyCdEndTime - now;
+    // if (cdRemaining > 0) {
+    //     taichicdFraction = cdRemaining / BLADEFLY_CD; // 或 ENEMY_CD
+    // } else {
+    //     taichicdFraction = 0.0;
+    //     enemyCdEndTime = null;
+    // }
+    // }
+    let taichicdFraction = 0.0;
+    const taichiRemaining = taichiendtime - now;
+    if (taichiRemaining > 0) {
+        taichicdFraction = taichiRemaining / 5.0; // 生太极持续时间5秒
+    } else {
+        taichicdFraction = 0.0;
+        // taichiendtime = null;
+    }
+    let logoWidth = logoHeight * (Assets.logoImg ? (Assets.logoImg.width / Assets.logoImg.height) : 4);
+    let logoX =(WIDTH - logoWidth) / 2;
+  let logoY = HEIGHT * 0.05;
+    drawCDFan(logoX, logoY, logoHeight, taichicdFraction);
 
   // 标题
   ctx.font = `bold ${titleSize}px "Microsoft YaHei", Arial`;
