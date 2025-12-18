@@ -12,7 +12,7 @@ export function initImages() {
   Assets.logoImg = new Image();
   Assets.logoImg.onload = () => { Assets.logoLoaded = true; };
   Assets.logoImg.onerror = () => { console.warn('Logo加载失败，请检查路径'); };
-  Assets.logoImg.src = 'logo.png';
+  Assets.logoImg.src = 'img/logo.png';
 
   // Skill Icon（先创建，后续再 setSkillIcon）
   Assets.skillImg = new Image();

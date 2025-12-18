@@ -79,9 +79,9 @@ window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 100)
 
 // #region ========== 1) 职业系统（JOBS / currentJob / setJob / getCdSeconds） ==========
 const JOBS = {
-  Blade:  { name: '剑纯', skillname: '剑飞惊天', icon: 'icon_blade.png',  skillSound: 'skill_blade',  cd: 3.0 },
-  Flower: { name: '万花', skillname: '厥阴指',   icon: 'icon_flower.png', skillSound: 'skill_flower', cd: 3.0 },
-  Toxic:  { name: '五毒', skillname: '灵蛊',     icon: 'icon_toxic.png',  skillSound: 'skill_toxic',  cd: 3.0 },
+  Blade:  { name: '剑纯', skillname: '剑飞惊天', icon: 'img/icon_blade.png',  skillSound: 'skill_blade',  cd: 3.0 },
+  Flower: { name: '万花', skillname: '厥阴指',   icon: 'img/icon_flower.png', skillSound: 'skill_flower', cd: 3.0 },
+  Toxic:  { name: '五毒', skillname: '灵蛊',     icon: 'img/icon_toxic.png',  skillSound: 'skill_toxic',  cd: 3.0 },
 };
 
 let currentJobKey = 'Blade';
