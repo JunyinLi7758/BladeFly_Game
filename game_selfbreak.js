@@ -3,7 +3,7 @@ import { Assets, initImages, setSkillIcon } from './assets.js';
 import { preloadAllSounds, unlockAudio, playSound, stopSound } from './audio.js';
 
 
-// #region ========== 0) 基本常量与画布（canvas / resize / layout缓存） ==========
+// #region ========== 0) 基本常量与画布（canvas / resize / layout缓存�?==========
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -11,10 +11,10 @@ let WIDTH = 900;
 let HEIGHT = 450;
 
 // 读条参数
-const BAR_DURATION = 0.56;   // 秒
+const BAR_DURATION = 0.56;   // �?
 const BAR_WIDTH_MAX = 600;   // px
 
-// 进度条颜色 & 淡出
+// 进度条颜�?& 淡出
 const BAR_COLOR_NORMAL = '0,180,90';
 const BAR_COLOR_HIT    = '255,64,64';
 
@@ -33,6 +33,9 @@ let iconSize = 0, iconX = 0, iconY = 0;
 let titleSize = 0, msgSize = 0, resultSize = 0;
 let barWidth = 0, barHeight = 0, barXAdj = 0, barY = 0;
 let logoHeight = 0;
+let logoWidth = 0, logoX = 0, logoY = 0;
+let titleFont = '', msgFont = '', resultFont = '';
+let logoAspect = 4;
 
 function layout() {
   iconSize = Math.min(WIDTH * 0.15, 100);
@@ -51,6 +54,13 @@ function layout() {
   barXAdj = barX - (barWidth - BAR_WIDTH_MAX) / 2;
 
   logoHeight = Math.min(HEIGHT * 0.15, 80);
+  logoWidth = logoHeight * logoAspect;
+  logoX = (WIDTH - logoWidth) / 2;
+  logoY = HEIGHT * 0.05;
+
+  titleFont = `bold ${titleSize}px "Microsoft YaHei", Arial`;
+  msgFont = `${msgSize}px "Microsoft YaHei", Arial`;
+  resultFont = `${resultSize}px "Microsoft YaHei", Arial`;
 
   layoutDirty = false;
 }
@@ -77,10 +87,10 @@ window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 100)
 
 
 
-// #region ========== 1) 职业系统（JOBS / currentJob / setJob / getCdSeconds） ==========
+// #region ========== 1) 职业系统（JOBS / currentJob / setJob / getCdSeconds�?==========
 const JOBS = {
   Blade:  { name: '剑纯', skillname: '剑飞惊天', icon: 'img/icon_blade.png',  skillSound: 'skill_blade',  cd: 3.0 },
-  Flower: { name: '万花', skillname: '厥阴指',   icon: 'img/icon_flower.png', skillSound: 'skill_flower', cd: 3.0 },
+  Flower: { name: '万花', skillname: '厥阴�?,   icon: 'img/icon_flower.png', skillSound: 'skill_flower', cd: 3.0 },
   Toxic:  { name: '五毒', skillname: '灵蛊',     icon: 'img/icon_toxic.png',  skillSound: 'skill_toxic',  cd: 3.0 },
 };
 
@@ -110,38 +120,38 @@ preloadAllSounds();
 
 
 
-// #region ========== 3) 游戏状态机（骗读条） ==========
+// #region ========== 3) 游戏状态机（骗读条�?==========
 
 let state = "READY"; // READY / CASTING / BAITING / RESULT
 
-let startTime = null;          // 本次读条开始时间
+let startTime = null;          // 本次读条开始时�?
 let barFraction = 0.0;         // 0~1
-let reactionTime = null;       // 结果展示用（成功=总用时；失败=被断时刻）
+let reactionTime = null;       // 结果展示用（成功=总用时；失败=被断时刻�?
 
 let message = `长按读条欺骗${currentJob.name}，骗到别忘了生太极！ `;
 
 
 // 敌方（电脑）行为参数
 let enemyCdEndTime = null;     // 敌方打断技能CD结束时间
-let enemyBreakFrac = null;     // 断点（0~1）
-let enemyReactSec = null;      // 敌方反应时间（秒）
+let enemyBreakFrac = null;     // 断点�?~1�?
+let enemyReactSec = null;      // 敌方反应时间（秒�?
 let enemyInterruptAt = null;   // 敌方计划打断的绝对时间（秒）
 
 let currentSkillSource = null;
 let currentBarSource = null;
 
-let BLADEFLY_CD = 3.0; // 敌方CD时间（可独立设置）
+let BLADEFLY_CD = 3.0; // 敌方CD时间（可独立设置�?
 
 let TAICHI_LAST_TIME = 5.0; // 生太极持续时间（秒）
 let taichiendtime = null;
-// 进度条颜色控制沿用你原来的
+// 进度条颜色控制沿用你原来�?
 // barRgb / barAlpha / barFadeActive / barHitFraction ...
 
 // #endregion
 
 
 
-// #region ========== 4) 输入事件（键盘/鼠标/触屏 + 职业按钮） ==========
+// #region ========== 4) 输入事件（键�?鼠标/触屏 + 职业按钮�?==========
 let pressStartTime = 0;
 const LONG_PRESS_TIME = 1000;
 let isPressing = false;
@@ -272,7 +282,7 @@ try {
 
 
 
-// #region ========== 5) 动作处理（原 handleSpaceKey：统一入口 handleAction） ==========
+// #region ========== 5) 动作处理（原 handleSpaceKey：统一入口 handleAction�?==========
 function playSkillOnce() {
   if (!currentJob.skillSound) return;
   stopSound(currentSkillSource);
@@ -282,18 +292,18 @@ function playSkillOnce() {
 async function handleAction() {
   const now = performance.now() / 1000;
 
-  // 移动端音频解锁（如果你还在用 audio.js 模块版就写 unlockAudio();）
+  // 移动端音频解锁（如果你还在用 audio.js 模块版就�?unlockAudio();�?
   // await unlockAudio();
 
   const enemyOnCd = (enemyCdEndTime !== null && now < enemyCdEndTime);
-//   console.log("当前状态:", state, "敌方CD中:", enemyOnCd);
+//   console.log("当前状�?", state, "敌方CD�?", enemyOnCd);
 
-  // RESULT / READY：开始读条
+  // RESULT / READY：开始读�?
   if (state === "READY" || state === "RESULT") {
     if (enemyOnCd) {  
         return;
         }
-    // 重置条显示
+    // 重置条显�?
     // playSkillOnce();
     barRgb = BAR_COLOR_NORMAL;
     barAlpha = 1.0;
@@ -305,22 +315,22 @@ async function handleAction() {
     startTime = now;
 
     taichiendtime = TAICHI_LAST_TIME + startTime;
-    // console.log("读条开始时间设为", startTime);
+    // console.log("读条开始时间设�?, startTime);
 
-    // 如果敌方不在CD：生成“断点+反应时间+打断时刻”
+    // 如果敌方不在CD：生成“断�?反应时间+打断时刻�?
     if (!enemyOnCd) {
       enemyBreakFrac = Math.random() * 0.9 - 0.1;      // 0.35~0.85
       enemyReactSec  = -Math.random() * 0.3 + 0.4;     // 0.10~0.25s
 // 
     //   console.log("敌方断点设为", enemyBreakFrac.toFixed(3),
-                //   "反应时间设为", enemyReactSec.toFixed(3), "秒");  
+                //   "反应时间设为", enemyReactSec.toFixed(3), "�?);  
     //   message = "开始读条，剑飞";
       enemyInterruptAt = null; // 重置打断时刻，由 update 计算
     } else {
       enemyBreakFrac = null;
       enemyReactSec = null;
       enemyInterruptAt = null;
-      message = "敌方在CD！稳稳读完就赢。";
+      message = "敌方在CD！稳稳读完就赢�?;
     }
     
     state = "CASTING";
@@ -343,22 +353,22 @@ async function handleAction() {
     enemyBreakFrac = Math.random() * 0.9 - 0.05;      // 0.35~0.85
     enemyReactSec = enemyReactSec * 0.6;
     // console.log("敌方断点设为", enemyBreakFrac.toFixed(3),
-                //   "反应时间设为", enemyReactSec.toFixed(3), "秒");  
+                //   "反应时间设为", enemyReactSec.toFixed(3), "�?);  
 
     state = "CASTING";
     // 播放读条音效（可选）
     stopSound(currentBarSource); currentBarSource = playSound('bar', false);
     return;  
     }
-  // CASTING：点击=取消读条（骗断）
+  // CASTING：点�?取消读条（骗断）
 
   else if (state === "CASTING") {
-    // 取消读条：进度归零（也可以保留显示，但更像“停手”就归零）
+    // 取消读条：进度归零（也可以保留显示，但更像“停手”就归零�?
     reactionTime = barFraction * BAR_DURATION; // 被断时刻（用于显示）
     barFraction = 0.0;
     // startTime = null;
 
-    message = "骗出来了吗？ 注意听声音";
+    message = "骗出来了吗？ 注意听声�?;
     state = "PAUSE";
     return;
   }
@@ -368,26 +378,30 @@ async function handleAction() {
 
 
 
-// #region ========== 6) 逻辑更新（update：推进状态机/读条/自断/超时/淡出） ==========
+// #region ========== 6) 逻辑更新（update：推进状态机/读条/自断/超时/淡出�?==========
 function update() {
   const now = performance.now() / 1000;
-//   console.log("当前状态:", startTime) ;
+
+  if (enemyCdEndTime !== null && now >= enemyCdEndTime) {
+    enemyCdEndTime = null;
+  }
+//   console.log("当前状�?", startTime) ;
 
   const enemyOnCd = (enemyCdEndTime !== null && now < enemyCdEndTime);
   
-  // CASTING：推进读条
+  // CASTING：推进读�?
   if (state === "CASTING" ) {
     const elapsed = now - startTime;
 
     let frac = elapsed / BAR_DURATION;
-    message = `生太极 ${(elapsed).toFixed(2)} / 0.56`;
-    // 读满：成功
+    message = `生太�?${(elapsed).toFixed(2)} / 0.56`;
+    // 读满：成�?
     if (frac >= 1.0) {
       frac = 1.0;
       barFraction = frac;
 
     //   reactionTime = elapsed; // 成功用时
-      message = `牛逼，你骗到${currentJob.name}了！点一下重开。`;
+      message = `牛逼，你骗�?{currentJob.name}了！点一下重开。`;
       state = "RESULT";
       stopSound(currentBarSource); currentBarSource=null;
       playSound('finish', false);
@@ -399,11 +413,11 @@ function update() {
 
       // 敌方不在CD，且到了计划打断时刻：如果你还在读条 -> 失败并进入敌方CD
       if (!enemyOnCd && enemyInterruptAt !== null && elapsed >= enemyInterruptAt) {
-        // 敌方成功打断你
+        // 敌方成功打断�?
         playSkillOnce();
 
         // 进入敌方CD
-        enemyCdEndTime = now + BLADEFLY_CD; // 你也可以单独设 ENEMY_CD
+        enemyCdEndTime = now + BLADEFLY_CD; // 你也可以单独�?ENEMY_CD
         enemyInterruptAt = null;
 
         reactionTime = elapsed; // 被断时刻（用于显示）
@@ -415,9 +429,9 @@ function update() {
         barFadeActive = true;
         barFadeStartTime = now;
 
-        message = `想骗${currentJob.name}？  等${currentJob.skillname.slice(0,2)}好了，重新再来吧~`;
+        message = `想骗${currentJob.name}�? �?{currentJob.skillname.slice(0,2)}好了，重新再来吧~`;
         state = "RESULT";
-        // playSound('skill_xxx') 可选
+        // playSound('skill_xxx') 可�?
       }
     }
   } else if (state === "PAUSE"){
@@ -425,26 +439,26 @@ function update() {
     // console.log("暂停状态，已过时长:", elapsed, startTime, now);
     if (enemyInterruptAt !== null && elapsed >= enemyInterruptAt) {
         playSkillOnce();
-        enemyCdEndTime = now + BLADEFLY_CD; // 你也可以单独设 ENEMY_CD
+        enemyCdEndTime = now + BLADEFLY_CD; // 你也可以单独�?ENEMY_CD
         enemyInterruptAt = null;
     }
-    // 暂停状态下不推进读条
+    // 暂停状态下不推进读�?
     barFraction = 0.0;
   }
   // READY：提示敌方CD剩余（可选）
   else if (state === "RESULT") {
     if (enemyOnCd) {
       const remain = (enemyCdEndTime - now).toFixed(1);
-    //   message = `被飞了吧！ 重新试着骗吧~ `;
+    //   message = `被飞了吧�?重新试着骗吧~ `;
     }
     else{
         message = `再骗一次试试，长按开始读条！`;
-        // message = "牛逼，你读条成功了！点一下重开。";
+        // message = "牛逼，你读条成功了！点一下重开�?;
         state = "READY";
     }
   }
 
-  // 红色条淡出（保留你原逻辑）
+  // 红色条淡出（保留你原逻辑�?
   if (barFadeActive) {
     const t = (now - barFadeStartTime) / BAR_FADE_DURATION;
     if (t >= 1) {
@@ -462,7 +476,7 @@ function update() {
 
 
 
-// #region ========== 7) 绘制系统（draw + 绘制工具函数） ==========
+// #region ========== 7) 绘制系统（draw + 绘制工具函数�?==========
 function drawRoundedRect(x, y, w, h, radius) {
   ctx.beginPath();
   ctx.moveTo(x + radius, y);
@@ -495,17 +509,7 @@ function drawCDFan(x, y, size, fraction) {
   ctx.save();
   ctx.fillStyle = 'rgba(0, 0, 0, 0.63)';
 
-  const points = [
-    { x: cx,     y: y        },
-    { x: x + w,  y: y        },
-    { x: x + w,  y: cy       },
-    { x: x + w,  y: y + h    },
-    { x: cx,     y: y + h    },
-    { x: x,      y: y + h    },
-    { x: x,      y: cy       },
-    { x: x,      y: y        },
-    { x: cx,     y: y        }
-  ];
+  const points = getCDFanPoints(x, y, w, h);
 
   const totalPoints = points.length - 1;
   const endIdx = Math.floor(totalPoints * (1 - fraction));
@@ -527,7 +531,37 @@ function drawCDFan(x, y, size, fraction) {
   ctx.restore();
 }
 
+const cdFanPointCache = new Map();
+function getCDFanPoints(x, y, w, h) {
+  const key = `${x},${y},${w},${h}`;
+  let points = cdFanPointCache.get(key);
+  if (!points) {
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    points = [
+      { x: cx,     y: y        },
+      { x: x + w,  y: y        },
+      { x: x + w,  y: cy       },
+      { x: x + w,  y: y + h    },
+      { x: cx,     y: y + h    },
+      { x: x,      y: y + h    },
+      { x: x,      y: cy       },
+      { x: x,      y: y        },
+      { x: cx,     y: y        }
+    ];
+    cdFanPointCache.set(key, points);
+  }
+  return points;
+}
+
 function draw() {
+  if (Assets.logoLoaded && Assets.logoImg) {
+    const nextAspect = Assets.logoImg.width / Assets.logoImg.height;
+    if (nextAspect !== logoAspect) {
+      logoAspect = nextAspect;
+      layoutDirty = true;
+    }
+  }
   if (layoutDirty) layout();
 
   ctx.fillStyle = '#1e1e1e';
@@ -537,23 +571,12 @@ function draw() {
 
   // Logo
   if (Assets.logoLoaded && Assets.logoImg) {
-    try {
-      const aspectRatio = Assets.logoImg.width / Assets.logoImg.height;
-      const logoWidth  = logoHeight * aspectRatio;
-      const logoX = (WIDTH - logoWidth) / 2;
-      const logoY = HEIGHT * 0.05;
-      ctx.drawImage(Assets.logoImg, logoX, logoY, logoWidth, logoHeight);
-    } catch (e) {}
+    ctx.drawImage(Assets.logoImg, logoX, logoY, logoWidth, logoHeight);
   }
 
   // Skill icon
   if (Assets.skillLoaded && Assets.skillImg) {
-    try {
-      ctx.drawImage(Assets.skillImg, iconX, iconY, iconSize, iconSize);
-    } catch (e) {
-      ctx.fillStyle = '#4a6fa5';
-      ctx.fillRect(iconX, iconY, iconSize, iconSize);
-    }
+    ctx.drawImage(Assets.skillImg, iconX, iconY, iconSize, iconSize);
   } else {
     ctx.fillStyle = '#4a6fa5';
     ctx.fillRect(iconX, iconY, iconSize, iconSize);
@@ -562,55 +585,38 @@ function draw() {
     ctx.strokeRect(iconX, iconY, iconSize, iconSize);
   }
 
-  // CD 扇形（用当前职业 CD）
-    let skillcdFraction = 0.0;
-    if (enemyCdEndTime !== null) {
+  // CD 扇形（用当前职业 CD�?
+  let skillcdFraction = 0.0;
+  if (enemyCdEndTime !== null) {
     const cdRemaining = enemyCdEndTime - now;
     if (cdRemaining > 0) {
-        skillcdFraction = cdRemaining / BLADEFLY_CD; // 或 ENEMY_CD
-    } else {
-        skillcdFraction = 0.0;
-        enemyCdEndTime = null;
+      skillcdFraction = cdRemaining / BLADEFLY_CD; // ENEMY_CD
     }
-    }
-    drawCDFan(iconX, iconY, iconSize, skillcdFraction);
+  }
+  drawCDFan(iconX, iconY, iconSize, skillcdFraction);
 
-    // CD 扇形（用当前职业 CD）
-    // let taichicdFraction = 0.5;
-    // if (enemyCdEndTime !== null) {
-    // const cdRemaining = enemyCdEndTime - now;
-    // if (cdRemaining > 0) {
-    //     taichicdFraction = cdRemaining / BLADEFLY_CD; // 或 ENEMY_CD
-    // } else {
-    //     taichicdFraction = 0.0;
-    //     enemyCdEndTime = null;
-    // }
-    // }
-    let taichicdFraction = 0.0;
-    const taichiRemaining = taichiendtime - now;
-    if (taichiRemaining > 0) {
-        taichicdFraction = taichiRemaining / 5.0; // 生太极持续时间5秒
-    } else {
-        taichicdFraction = 0.0;
-        // taichiendtime = null;
-    }
-    let logoWidth = logoHeight * (Assets.logoImg ? (Assets.logoImg.width / Assets.logoImg.height) : 4);
-    let logoX =(WIDTH - logoWidth) / 2;
-    let logoY = HEIGHT * 0.05;
-    drawCDFan(logoX, logoY, logoHeight, taichicdFraction);
+  let taichicdFraction = 0.0;
+  const taichiRemaining = taichiendtime - now;
+  if (taichiRemaining > 0) {
+    taichicdFraction = taichiRemaining / 5.0; // ?��??��a????????-?��?����??��?
+  } else {
+    taichicdFraction = 0.0;
+    // taichiendtime = null;
+  }
+  drawCDFan(logoX, logoY, logoHeight, taichicdFraction);
 
   // 标题
-  ctx.font = `bold ${titleSize}px "Microsoft YaHei", Arial`;
+  ctx.font = titleFont;
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.fillText('欺骗剑纯模拟器v1.1', WIDTH / 2, HEIGHT * 0.25);
 
   // message
-  ctx.font = `${msgSize}px "Microsoft YaHei", Arial`;
+  ctx.font = msgFont;
   ctx.fillStyle = '#dcdcdc';
   ctx.fillText(message, WIDTH / 2, HEIGHT * 0.36);
 
-  // 结果行
+  // 结果�?
     let text;
     if (state === "RESULT") {
     if (reactionTime !== null) {
@@ -623,15 +629,15 @@ function draw() {
     }
 
 
-  ctx.font = `${resultSize}px "Microsoft YaHei", Arial`;
+  ctx.font = resultFont;
   ctx.fillStyle = '#ffff00';
   ctx.fillText(text, WIDTH / 2, HEIGHT * 0.85);
 
-  // 进度条背景
+  // 进度条背�?
   ctx.fillStyle = '#505050';
   drawRoundedRect(barXAdj, barY, barWidth, barHeight, 8);
 
-  // 进度条填充
+  // 进度条填�?
   let drawFrac = barFadeActive ? barHitFraction : barFraction;
   if (drawFrac > 0) {
     ctx.fillStyle = `rgba(${barRgb}, ${barAlpha})`;
@@ -642,7 +648,7 @@ function draw() {
 
 
 
-// #region ========== 8) 主循环（gameLoop） ==========
+// #region ========== 8) 主循环（gameLoop�?==========
 function gameLoop() {
   update();
   draw();
@@ -651,3 +657,12 @@ function gameLoop() {
 
 gameLoop();
 // #endregion
+
+
+
+
+
+
+
+
+
