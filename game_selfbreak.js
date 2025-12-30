@@ -299,6 +299,42 @@ function playSkillOnce() {
   currentSkillSource = playSound(currentJob.skillSound, false);
 }
 
+function resetBarVisuals() {
+  barRgb = BAR_COLOR_NORMAL;
+  barAlpha = 1.0;
+  barFadeActive = false;
+  barHitFraction = 0;
+}
+
+function startCasting(now) {
+  resetBarVisuals();
+  barFraction = 0.0;
+  startTime = now;
+  taichiendtime = TAICHI_LAST_TIME + startTime;
+
+  state = "CASTING";
+  stopSound(currentBarSource);
+  currentBarSource = playSound('bar', false);
+}
+
+function planEnemyBreakOnStart() {
+  enemyBreakFrac = Math.random() * 0.9 - 0.1;      // 0.35~0.85
+  enemyReactSec  = -Math.random() * 0.3 + 0.4;     // 0.10~0.25s
+  enemyInterruptAt = null;
+}
+
+function planEnemyBreakOnResume() {
+  enemyBreakFrac = Math.random() * 0.9 - 0.05;     // 0.35~0.85
+  enemyReactSec = enemyReactSec * 0.6;
+}
+
+function cancelCasting() {
+  reactionTime = barFraction * BAR_DURATION; // 被断时刻（用于显示）
+  barFraction = 0.0;
+  message = "骗出来了吗？注意听声音！";
+  state = "PAUSE";
+}
+
 async function handleAction() {
   const now = performance.now() / 1000;
 
@@ -313,29 +349,12 @@ async function handleAction() {
     if (enemyOnCd) {  
         return;
         }
-    // 重置条显示
-    // playSkillOnce();
-    barRgb = BAR_COLOR_NORMAL;
-    barAlpha = 1.0;
-    barFadeActive = false;
-    barHitFraction = 0;
-
-    // reactionTime = null;
-    barFraction = 0.0;
-    startTime = now;
-
-    taichiendtime = TAICHI_LAST_TIME + startTime;
-    // console.log("读条开始时间设置", startTime);
-
     // 如果敌方不在CD：生成“断点反应时间+打断时刻”
     if (!enemyOnCd) {
-      enemyBreakFrac = Math.random() * 0.9 - 0.1;      // 0.35~0.85
-      enemyReactSec  = -Math.random() * 0.3 + 0.4;     // 0.10~0.25s
-// 
-    //   console.log("敌方断点设为", enemyBreakFrac.toFixed(3),
-                //   "反应时间设为", enemyReactSec.toFixed(3), "秒);  
-    //   message = "开始读条，剑飞";
-      enemyInterruptAt = null; // 重置打断时刻，由 update 计算
+      planEnemyBreakOnStart();
+      // console.log("敌方断点设为", enemyBreakFrac.toFixed(3),
+      //   "反应时间设为", enemyReactSec.toFixed(3), "秒);  
+      // message = "开始读条，剑飞";
     } else {
       enemyBreakFrac = null;
       enemyReactSec = null;
@@ -343,43 +362,25 @@ async function handleAction() {
       message = "敌方在CD！稳稳读完就赢啦~;"
     }
     
-    state = "CASTING";
     // 播放读条音效（可选）
-    stopSound(currentBarSource); currentBarSource = playSound('bar', false);
+    startCasting(now);
     return;
   }
   else if (state === "PAUSE") {
-      // playSkillOnce();
-    barRgb = BAR_COLOR_NORMAL;
-    barAlpha = 1.0;
-    barFadeActive = false;
-    barHitFraction = 0;
-
-    // reactionTime = null;
-    barFraction = 0.0;
-    startTime = now;
-
     // enemyBreakFrac += 0.4* (0.9-enemyBreakFrac);
-    enemyBreakFrac = Math.random() * 0.9 - 0.05;      // 0.35~0.85
-    enemyReactSec = enemyReactSec * 0.6;
+    planEnemyBreakOnResume();
     // console.log("敌方断点设为", enemyBreakFrac.toFixed(3),
-                //   "反应时间设为", enemyReactSec.toFixed(3), "秒);  
+    //   "反应时间设为", enemyReactSec.toFixed(3), "秒);  
 
-    state = "CASTING";
     // 播放读条音效（可选）
-    stopSound(currentBarSource); currentBarSource = playSound('bar', false);
+    startCasting(now);
     return;  
     }
   // CASTING：点击取消读条（骗断）
 
   else if (state === "CASTING") {
     // 取消读条：进度归零（也可以保留显示，但更像“停手”就归零）
-    reactionTime = barFraction * BAR_DURATION; // 被断时刻（用于显示）
-    barFraction = 0.0;
-    // startTime = null;
-
-    message = "骗出来了吗？注意听声音！";
-    state = "PAUSE";
+    cancelCasting();
     return;
   }
 }
@@ -387,6 +388,83 @@ async function handleAction() {
 // #endregion
 
 
+
+function finishCasting() {
+  barFraction = 1.0;
+  message = `牛逼，你骗到 ${currentJob.name}了！点一下重开。`;
+  state = "RESULT";
+  stopSound(currentBarSource);
+  currentBarSource = null;
+  playSound('finish', false);
+}
+
+function interruptCasting(now, elapsed) {
+  playSkillOnce();
+
+  enemyCdEndTime = now + BLADEFLY_CD; // 你也可以单独设 ENEMY_CD
+  enemyInterruptAt = null;
+
+  reactionTime = elapsed; // 被断时刻（用于显示）
+
+  // 红条提示（表示“你被断了”）
+  barHitFraction = Math.max(0, Math.min(1, barFraction));
+  barRgb = BAR_COLOR_HIT;
+  barAlpha = 1.0;
+  barFadeActive = true;
+  barFadeStartTime = now;
+
+  message = `想骗${currentJob.name}读条? ${currentJob.skillname.slice(0,2)}好了，重新再来吧~`;
+  state = "RESULT";
+  // playSound('skill_xxx') 可选
+}
+
+function updateCasting(now, enemyOnCd) {
+  const elapsed = now - startTime;
+
+  const frac = elapsed / BAR_DURATION;
+  message = `生太极${(elapsed).toFixed(2)} / 0.56`;
+
+  if (frac >= 1.0) {
+    finishCasting();
+    return;
+  }
+
+  if (enemyInterruptAt == null && frac >= enemyBreakFrac && !enemyOnCd) {
+    enemyInterruptAt = enemyBreakFrac * BAR_DURATION + enemyReactSec;
+    // console.log(now,startTime,"敌方计划打断时刻设为", enemyInterruptAt);
+  }
+
+  barFraction = frac;
+
+  // 敌方不在CD，且到了计划打断时刻：如果你还在读条 -> 失败并进入敌方CD
+  if (!enemyOnCd && enemyInterruptAt !== null && elapsed >= enemyInterruptAt) {
+    interruptCasting(now, elapsed);
+  }
+}
+
+function updatePause(now) {
+  const elapsed = now - startTime;
+  // console.log("暂停状态，已过时长:", elapsed, startTime, now);
+  if (enemyInterruptAt !== null && elapsed >= enemyInterruptAt) {
+    playSkillOnce();
+    enemyCdEndTime = now + BLADEFLY_CD; // 你也可以单独设 ENEMY_CD
+    enemyInterruptAt = null;
+  }
+  // 暂停状态下不推进读条
+  barFraction = 0.0;
+}
+
+function updateResult(now, enemyOnCd) {
+  if (enemyOnCd) {
+    const remain = (enemyCdEndTime - now).toFixed(1);
+    // message = `被飞了吧？重新试着骗吧~ `;
+    return;
+  }
+
+  message = `再骗一次试试，长按开始读条！`;
+  // message = "牛逼，你读条成功了！点一下重开吧";
+  state = "READY";
+}
 
 // #region ========== 6) 逻辑更新（update：推进状态机/读条/自断/超时/淡出）==========
 function update() {
@@ -400,71 +478,13 @@ function update() {
   
   // CASTING：推进读条
   if (state === "CASTING" ) {
-    const elapsed = now - startTime;
-
-    let frac = elapsed / BAR_DURATION;
-    message = `生太极${(elapsed).toFixed(2)} / 0.56`;
-    // 读满：成功
-    if (frac >= 1.0) {
-      frac = 1.0;
-      barFraction = frac;
-
-    //   reactionTime = elapsed; // 成功用时
-      message = `牛逼，你骗到 ${currentJob.name}了！点一下重开。`;
-      state = "RESULT";
-      stopSound(currentBarSource); currentBarSource=null;
-      playSound('finish', false);
-    } else if (enemyInterruptAt == null && frac >= enemyBreakFrac && !enemyOnCd) {
-        enemyInterruptAt = enemyBreakFrac * BAR_DURATION + enemyReactSec;
-        // console.log(now,startTime,"敌方计划打断时刻设为", enemyInterruptAt);
-    }else {
-      barFraction = frac;
-
-      // 敌方不在CD，且到了计划打断时刻：如果你还在读条 -> 失败并进入敌方CD
-      if (!enemyOnCd && enemyInterruptAt !== null && elapsed >= enemyInterruptAt) {
-        // 敌方成功打断
-        playSkillOnce();
-
-        // 进入敌方CD
-        enemyCdEndTime = now + BLADEFLY_CD; // 你也可以单独设 ENEMY_CD
-        enemyInterruptAt = null;
-
-        reactionTime = elapsed; // 被断时刻（用于显示）
-
-        // 红条提示（表示“你被断了”）
-        barHitFraction = Math.max(0, Math.min(1, barFraction));
-        barRgb = BAR_COLOR_HIT;
-        barAlpha = 1.0;
-        barFadeActive = true;
-        barFadeStartTime = now;
-
-        message = `想骗${currentJob.name}读条? ${currentJob.skillname.slice(0,2)}好了，重新再来吧~`;
-        state = "RESULT";
-        // playSound('skill_xxx') 可选
-      }
-    }
+    updateCasting(now, enemyOnCd);
   } else if (state === "PAUSE"){
-    const elapsed = now - startTime;
-    // console.log("暂停状态，已过时长:", elapsed, startTime, now);
-    if (enemyInterruptAt !== null && elapsed >= enemyInterruptAt) {
-        playSkillOnce();
-        enemyCdEndTime = now + BLADEFLY_CD; // 你也可以单独设 ENEMY_CD
-        enemyInterruptAt = null;
-    }
-    // 暂停状态下不推进读条
-    barFraction = 0.0;
+    updatePause(now);
   }
   // READY：提示敌方CD剩余（可选）
   else if (state === "RESULT") {
-    if (enemyOnCd) {
-      const remain = (enemyCdEndTime - now).toFixed(1);
-    //   message = `被飞了吧？重新试着骗吧~ `;
-    }
-    else{
-        message = `再骗一次试试，长按开始读条！`;
-        // message = "牛逼，你读条成功了！点一下重开吧";
-        state = "READY";
-    }
+    updateResult(now, enemyOnCd);
   }
 
   // 红色条淡出（保留你原逻辑）
