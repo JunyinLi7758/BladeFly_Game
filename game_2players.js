@@ -1,0 +1,549 @@
+// game_2players.js
+import { Assets, initImages, setSkillIcon } from './assets.js';
+import { preloadAllSounds, unlockAudio, playSound, stopSound } from './audio.js';
+
+// #region ========== 0) 基本常量与画布（canvas / resize / layout缓存）==========
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let WIDTH = 900;
+let HEIGHT = 450;
+
+// 读条参数
+const BAR_DURATION = 0.56;   // 秒
+const BAR_WIDTH_MAX = 600;   // px
+
+// 进度条颜色 & 淡出
+const BAR_COLOR_NORMAL = '0,180,90';
+const BAR_COLOR_HIT    = '255,64,64';
+
+const UI = {
+  bg: '#1e1e1e',
+  textMain: '#ffffff',
+  textSub: '#dcdcdc',
+  textResult: '#ffff00',
+  barBg: '#505050',
+  iconFallback: '#4a6fa5',
+  iconStroke: '#666',
+  title: '\u6B3A\u9A97\u5251\u7EAF\u6A21\u62DF\u5668v1.1'
+};
+let barRgb = BAR_COLOR_NORMAL;
+let barAlpha = 1.0;
+let barFadeActive = false;
+let barFadeStartTime = 0;
+const BAR_FADE_DURATION = 0.4;
+let barHitFraction = 0.0;
+
+// 方案A：布局缓存
+let layoutDirty = true;
+
+// 布局缓存变量
+let iconSize = 0, iconX = 0, iconY = 0;
+let titleSize = 0, msgSize = 0, resultSize = 0;
+let barWidth = 0, barHeight = 0, barXAdj = 0, barY = 0;
+let logoHeight = 0;
+let logoWidth = 0, logoX = 0, logoY = 0;
+let titleFont = '', msgFont = '', resultFont = '';
+let logoAspect = 4;
+
+function layout() {
+  iconSize = Math.min(WIDTH * 0.15, 100);
+  iconX = (WIDTH - iconSize) / 2;
+  iconY = HEIGHT * 0.62;
+
+  titleSize  = Math.max(24, WIDTH * 0.06);
+  msgSize    = Math.max(16, WIDTH * 0.04);
+  resultSize = Math.max(16, WIDTH * 0.04);
+
+  barWidth  = Math.min(BAR_WIDTH_MAX, WIDTH * 0.8);
+  barHeight = Math.max(20, HEIGHT * 0.08);
+  barY = HEIGHT * 0.47;
+
+  const barX = (WIDTH - BAR_WIDTH_MAX) / 2;
+  barXAdj = barX - (barWidth - BAR_WIDTH_MAX) / 2;
+
+  logoHeight = Math.min(HEIGHT * 0.15, 80);
+  logoWidth = logoHeight * logoAspect;
+  logoX = (WIDTH - logoWidth) / 2;
+  logoY = HEIGHT * 0.05;
+
+  titleFont = `bold ${titleSize}px "Microsoft YaHei", Arial`;
+  msgFont = `${msgSize}px "Microsoft YaHei", Arial`;
+  resultFont = `${resultSize}px "Microsoft YaHei", Arial`;
+
+  layoutDirty = false;
+}
+
+function resizeCanvas() {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+
+  canvas.width  = rect.width  * dpr;
+  canvas.height = rect.height * dpr;
+
+  WIDTH  = rect.width;
+  HEIGHT = rect.height;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  layoutDirty = true;
+}
+
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 100));
+// #endregion
+
+
+
+// #region ========== 1) 职业系统（JOBS / currentJob / setJob / getCdSeconds）==========
+const JOBS = {
+  Blade:  { name: '剑纯', skillname: '剑飞惊天', icon: 'img/icon_blade.png',  skillSound: 'skill_blade',  cd: 3.0 },
+  Flower: { name: '万花', skillname: '厥阴',   icon: 'img/icon_flower.png', skillSound: 'skill_flower', cd: 3.0 },
+  Toxic:  { name: '五毒', skillname: '灵蛊',     icon: 'img/icon_toxic.png',  skillSound: 'skill_toxic',  cd: 3.0 },
+};
+
+let currentJobKey = 'Blade';
+let currentJob = JOBS[currentJobKey];
+
+function getCdSeconds() {
+  return (currentJob && typeof currentJob.cd === 'number') ? currentJob.cd : 3.0;
+}
+
+function setJob(jobKey) {
+  if (!JOBS[jobKey]) return;
+  currentJobKey = jobKey;
+  currentJob = JOBS[jobKey];
+  setSkillIcon(currentJob.icon);
+  message = `长按读条欺骗${currentJob.name}，骗到别忘了生太极！`;
+}
+// #endregion
+
+
+
+// #region ========== 2) 资源初始化（图片/音效预加载） ==========
+initImages();
+setSkillIcon(currentJob.icon);
+preloadAllSounds();
+// #endregion
+
+
+
+// ====== System State ======
+const SystemState = {
+  IDLE: 'IDLE',
+  PREPARE: 'PREPARE',
+  RUNNING: 'RUNNING',
+  AWIN: 'AWIN',
+  BWIN: 'BWIN'
+};
+
+const AState = {
+  NO_CASTING: 'NO_CASTING',
+  CASTING: 'CASTING'
+};
+
+const BState = {
+  NO_CD: 'NO_CD',
+  IN_CD: 'IN_CD'
+};
+
+let systemState = SystemState.IDLE;
+let aState = AState.NO_CASTING;
+let bState = BState.NO_CD;
+let message = '2P mode';
+
+// Time
+let startTime = null;
+let prepareStartTime = null;
+
+// Casting
+const CAST_DURATION = 0.63;
+let barFraction = 0.0;
+
+// A/B ready flags
+let aReady = false;
+let bReady = false;
+
+// COM mode flags
+let aComMode = false;
+let bComMode = false;
+
+// B cooldown
+const B_CD_SECONDS = 3.0;
+let bCdEndTime = null;
+
+// ====== Strategy ======
+const AStrategy = {
+  startChance: 0.5,
+  cancelAtFrac: 0.4
+};
+
+const BStrategy = {
+  reactionAtFrac: 0.6,
+  reactionTime: 0.2
+};
+
+// ====== Assets / init ======
+initImages();
+preloadAllSounds();
+
+// ====== A system ======
+function AReady() {
+  aReady = true;
+}
+
+function ASetComMode(enabled) {
+  aComMode = Boolean(enabled);
+}
+
+function AStartCasting(now) {
+  if (systemState !== SystemState.RUNNING) return;
+  aState = AState.CASTING;
+  startTime = now;
+  barFraction = 0.0;
+}
+
+function ACancelCasting(now) {
+  if (systemState !== SystemState.RUNNING) return;
+  aState = AState.NO_CASTING;
+  barFraction = 0.0;
+}
+
+// ====== B system ======
+function BReady() {
+  bReady = true;
+}
+
+function BSetComMode(enabled) {
+  bComMode = Boolean(enabled);
+}
+
+function BInterrupt(now) {
+  if (bCdEndTime !== null && now < bCdEndTime) return;
+
+  if (systemState === SystemState.RUNNING && aState === AState.CASTING) {
+    systemState = SystemState.BWIN;
+    aReady = false;
+    bReady = false;
+    aState = AState.NO_CASTING;
+  }
+  bState = BState.IN_CD;
+  bCdEndTime = now + B_CD_SECONDS;
+}
+
+// ====== System ======
+function maybeEnterPrepare(now) {
+  if ((systemState === SystemState.IDLE || systemState === SystemState.AWIN || systemState === SystemState.BWIN
+  ) && aReady && bReady) {
+    systemState = SystemState.PREPARE;
+    prepareStartTime = now;
+  }
+}
+
+function updatePrepare(now) {
+  if (prepareStartTime === null) return;
+
+  if (now - prepareStartTime >= 3.0) {
+    systemState = SystemState.RUNNING;
+    aState = AState.NO_CASTING;
+    bState = BState.NO_CD;
+    startTime = null;
+    barFraction = 0.0;
+  }
+}
+
+function updateCasting(now) {
+  if (aState !== AState.CASTING) return;
+  const elapsed = now - startTime;
+  barFraction = elapsed / CAST_DURATION;
+  if (barFraction >= 1.0) {
+    barFraction = 1.0;
+    systemState = SystemState.AWIN;
+    aReady = false;
+    bReady = false;
+    aState = AState.NO_CASTING;
+  }
+}
+
+function UpdateA(now) {
+  if (aState === AState.CASTING) {
+    updateCasting(now);
+  }
+}
+
+function UpdateB(now) {
+  if (bState === BState.IN_CD && bCdEndTime !== null && now >= bCdEndTime) {
+    bCdEndTime = null;
+    bState = BState.NO_CD;
+  }
+}
+
+function UpdateAStrategy(now) {
+  if (systemState !== SystemState.RUNNING) return;
+
+  if (aState === AState.NO_CASTING) {
+    if (Math.random() < AStrategy.startChance) {
+      AStartCasting(now);
+    }
+    return;
+  }
+
+  if (aState === AState.CASTING && barFraction >= AStrategy.cancelAtFrac) {
+    ACancelCasting(now);
+  }
+}
+
+function UpdateBStrategy(now) {
+  if (systemState !== SystemState.RUNNING) return;
+  // Use strategy to trigger B interrupt around target fraction.
+  if (bCdEndTime !== null && now < bCdEndTime) return;
+  if (startTime === null) return;
+
+  const elapsed = now - startTime;
+  const frac = elapsed / CAST_DURATION;
+  if (frac >= BStrategy.reactionAtFrac) {
+    // Apply reaction delay
+    if (elapsed >= BStrategy.reactionAtFrac * CAST_DURATION + BStrategy.reactionTime) {
+      BInterrupt(now);
+    }
+  }
+}
+
+function SystemUpdate() {
+  const now = performance.now() / 1000;
+
+  maybeEnterPrepare(now);
+
+  if (systemState === SystemState.PREPARE) {
+    updatePrepare(now);
+    return;
+  }
+
+  if (systemState === SystemState.RUNNING) {
+    if (aComMode) UpdateAStrategy(now);
+    UpdateA(now);
+    UpdateB(now);
+    if (bComMode) UpdateBStrategy(now);
+  }
+}
+
+// ====== Input (placeholder) ======
+// Hook your input/UI to call AReady/BReady/AStartCasting/ACancelCasting/BInterrupt.
+window.addEventListener('keydown', (e) => {
+  if (e.repeat) return;
+  const now = performance.now() / 1000;
+
+  if (!aComMode) {
+    if (e.key === 'a') AReady();
+    if (e.key === 's') AStartCasting(now);
+    if (e.key === 'd') ACancelCasting(now);
+  }
+
+  if (!bComMode) {
+    if (e.key === 'j') BReady();
+    if (e.key === 'k') BInterrupt(now);
+  }
+});
+
+window.addEventListener('mousedown', () => {
+  const now = performance.now() / 1000;
+  if (!aComMode) AStartCasting(now);
+});
+
+
+// #region ========== 7) 绘制系统（draw + 绘制工具函数）=========
+function drawRoundedRect(x, y, w, h, radius) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+  ctx.lineTo(x + radius, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawCDFan(x, y, size, fraction) {
+  if (fraction <= 0) return;
+
+  const w = size;
+  const h = size;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+
+  if (fraction >= 1) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.63)';
+    ctx.fillRect(x, y, w, h);
+    return;
+  }
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.63)';
+
+  const points = getCDFanPoints(x, y, w, h);
+
+  const totalPoints = points.length - 1;
+  const endIdx = Math.floor(totalPoints * (1 - fraction));
+
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+
+  for (let i = 0; i <= endIdx; i++) ctx.lineTo(points[i].x, points[i].y);
+
+  if (endIdx < totalPoints) {
+    const t = (totalPoints * (1 - fraction)) % 1;
+    const p1 = points[endIdx];
+    const p2 = points[endIdx + 1];
+    ctx.lineTo(p1.x + (p2.x - p1.x) * t, p1.y + (p2.y - p1.y) * t);
+  }
+
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+const cdFanPointCache = new Map();
+
+function getCDFanPoints(x, y, w, h) {
+  const key = `${x},${y},${w},${h}`;
+  let points = cdFanPointCache.get(key);
+  if (!points) {
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    points = [
+      { x: cx,     y: y        },
+      { x: x + w,  y: y        },
+      { x: x + w,  y: cy       },
+      { x: x + w,  y: y + h    },
+      { x: cx,     y: y + h    },
+      { x: x,      y: y + h    },
+      { x: x,      y: cy       },
+      { x: x,      y: y        },
+      { x: cx,     y: y        }
+    ];
+    cdFanPointCache.set(key, points);
+  }
+  return points;
+}
+
+function updateLogoAspect() {
+  if (Assets.logoLoaded && Assets.logoImg) {
+    const nextAspect = Assets.logoImg.width / Assets.logoImg.height;
+    if (nextAspect !== logoAspect) {
+      logoAspect = nextAspect;
+      layoutDirty = true;
+    }
+  }
+}
+
+function drawLogo() {
+  if (Assets.logoLoaded && Assets.logoImg) {
+    ctx.drawImage(Assets.logoImg, logoX, logoY, logoWidth, logoHeight);
+  }
+}
+
+function drawSkillIcon() {
+  if (Assets.skillLoaded && Assets.skillImg) {
+    ctx.drawImage(Assets.skillImg, iconX, iconY, iconSize, iconSize);
+  } else {
+    ctx.fillStyle = UI.iconFallback;
+    ctx.fillRect(iconX, iconY, iconSize, iconSize);
+    ctx.strokeStyle = UI.iconStroke;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(iconX, iconY, iconSize, iconSize);
+  }
+}
+
+function drawCooldownOverlay(target, remaining, total) {
+  let fraction = 0.0;
+  if (remaining > 0) {
+    fraction = remaining / total;
+  }
+  drawCDFan(target.x, target.y, target.size, fraction);
+}
+
+function drawCooldownOverlays(now) {
+  const iconTarget = { x: iconX, y: iconY, size: iconSize };
+
+  let cdRemaining = 0.0;
+  if (bCdEndTime !== null) {
+    cdRemaining = bCdEndTime - now;
+  }
+  drawCooldownOverlay(iconTarget, cdRemaining, B_CD_SECONDS);
+}
+
+function drawCastBar() {
+  ctx.fillStyle = UI.barBg;
+  drawRoundedRect(barXAdj, barY, barWidth, barHeight, 8);
+
+  const drawFrac = barFadeActive ? barHitFraction : barFraction;
+  if (drawFrac > 0) {
+    ctx.fillStyle = `rgba(${barRgb}, ${barAlpha})`;
+    drawRoundedRect(barXAdj, barY, barWidth * drawFrac, barHeight, 8);
+  }
+}
+
+function drawTexts() {
+  ctx.font = titleFont;
+  ctx.fillStyle = UI.textMain;
+  ctx.textAlign = 'center';
+  ctx.fillText(UI.title, WIDTH / 2, HEIGHT * 0.25);
+
+  ctx.font = msgFont;
+  ctx.fillStyle = UI.textSub;
+  ctx.fillText(message, WIDTH / 2, HEIGHT * 0.36);
+
+  let text;
+  if (systemState === SystemState.AWIN) {
+    text = 'A WIN';
+  } else if (systemState === SystemState.BWIN) {
+    text = 'B WIN';
+  } else {
+    text = `System: ${systemState} | A: ${aState} | B: ${bState}`;
+  }
+
+  ctx.font = resultFont;
+  ctx.fillStyle = UI.textResult;
+  ctx.fillText(text, WIDTH / 2, HEIGHT * 0.85);
+}
+
+function draw() {
+  updateLogoAspect();
+  if (layoutDirty) layout();
+
+  ctx.fillStyle = UI.bg;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  const now = performance.now() / 1000;
+
+  // Logo
+  drawLogo();
+
+  // Skill icon
+  drawSkillIcon();
+
+  // CD
+  drawCooldownOverlays(now);
+
+  // Text
+  drawTexts();
+
+  // Cast bar
+  drawCastBar();
+}
+// #endregion
+
+
+
+function gameLoop() {
+  SystemUpdate();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+gameLoop();

@@ -329,7 +329,12 @@ function BStartPause(now) {
 }
 //#endregion
 
-//#region ========== 5.3) 系统更新（读条推进/敌方打断/结果处理）=========
+
+//#endregion
+
+
+
+// #region ========== 6) 逻辑更新（update：推进状态机/读条/自断/超时/淡出）==========
 function SystemPlaySkillOnce() {
   if (!currentJob.skillSound) return;
   stopSound(currentSkillSource);
@@ -433,12 +438,7 @@ async function handleAction() {
     return;
   }
 }
-//#endregion  
-//#endregion
 
-
-
-// #region ========== 6) 逻辑更新（update：推进状态机/读条/自断/超时/淡出）==========
 function SystemUpdate() {
   const now = performance.now() / 1000;
 

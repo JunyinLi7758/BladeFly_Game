@@ -1,4 +1,4 @@
-// game.js
+﻿// game.js
 import { Assets, initImages, setSkillIcon } from './assets.js';
 import { preloadAllSounds, unlockAudio, playSound, stopSound } from './audio.js';
 
@@ -18,6 +18,17 @@ const BAR_WIDTH_MAX = 600;   // px
 const BAR_COLOR_NORMAL = '0,180,90';
 const BAR_COLOR_HIT    = '255,64,64';
 
+const UI = {
+  bg: '#1e1e1e',
+  textMain: '#ffffff',
+  textSub: '#dcdcdc',
+  textResult: '#ffff00',
+  barBg: '#505050',
+  iconFallback: '#4a6fa5',
+  iconStroke: '#666',
+  title: '折磨气纯模拟器v1.6'
+};
+
 let barRgb = BAR_COLOR_NORMAL;
 let barAlpha = 1.0;
 let barFadeActive = false;
@@ -33,6 +44,9 @@ let iconSize = 0, iconX = 0, iconY = 0;
 let titleSize = 0, msgSize = 0, resultSize = 0;
 let barWidth = 0, barHeight = 0, barXAdj = 0, barY = 0;
 let logoHeight = 0;
+let logoWidth = 0, logoX = 0, logoY = 0;
+let titleFont = '', msgFont = '', resultFont = '';
+let logoAspect = 4;
 
 function layout() {
   iconSize = Math.min(WIDTH * 0.15, 100);
@@ -51,6 +65,13 @@ function layout() {
   barXAdj = barX - (barWidth - BAR_WIDTH_MAX) / 2;
 
   logoHeight = Math.min(HEIGHT * 0.15, 80);
+  logoWidth = logoHeight * logoAspect;
+  logoX = (WIDTH - logoWidth) / 2;
+  logoY = HEIGHT * 0.05;
+
+  titleFont = `bold ${titleSize}px "Microsoft YaHei", Arial`;
+  msgFont = `${msgSize}px "Microsoft YaHei", Arial`;
+  resultFont = `${resultSize}px "Microsoft YaHei", Arial`;
 
   layoutDirty = false;
 }
@@ -195,10 +216,56 @@ try {
 
 
 // #region ========== 5) 动作处理（原 handleSpaceKey：统一入口 handleAction） ==========
-function playSkillOnce() {
-  if (!currentJob.skillSound) return;
-  stopSound(currentSkillSource);
-  currentSkillSource = playSound(currentJob.skillSound, false);
+
+function AResetBarVisuals() {
+  barRgb = BAR_COLOR_NORMAL;
+  barAlpha = 1.0;
+  barFadeActive = false;
+  barHitFraction = 0;
+}
+
+function AStartPrepare(now) {
+  AResetBarVisuals();
+
+  barFraction = 0;
+  reactionTime = null;
+
+  signalTime = null;
+  startTime = null;
+
+  const delay = Math.random() * 2.0 + 1.0; // 1~3秒
+  waitUntil = now + delay;
+  message = "准备中...";
+  state = "PREPARE";
+}
+
+function BStartTooEarly(now) {
+  state = "TOO_EARLY";
+  bladeflycdEndTime = now + getCdSeconds();
+  playSkillOnce();
+  message = "骗你到了吧~  菜，就多练！ ";
+  waitUntil = now + 0.4;
+}
+
+function AHandleBreak(now) {
+  stopSound(currentBarSource);
+  currentBarSource = null;
+
+  playSkillOnce();
+
+  reactionTime = now - signalTime;
+  lastReactionMs = Math.round(reactionTime * 1000);
+
+  bladeflycdEndTime = now + getCdSeconds();
+  message = "好断，哥们儿好断! 点屏幕再来！";
+
+  barHitFraction = Math.max(0, Math.min(1, barFraction));
+  barRgb = BAR_COLOR_HIT;
+  barAlpha = 1.0;
+  barFadeActive = true;
+  barFadeStartTime = now;
+
+  state = "RESULT";
 }
 
 async function handleAction() {
@@ -216,54 +283,19 @@ async function handleAction() {
 
   // 已完成：开始新一轮
   if (state === "IDLE" || state === "RESULT" || state === "TOO_EARLY") {
-    barRgb = BAR_COLOR_NORMAL;
-    barAlpha = 1.0;
-    barFadeActive = false;
-    barHitFraction = 0;
-
-    barFraction = 0;
-    reactionTime = null;
-
-    signalTime = null;
-    startTime  = null;
-
-    const delay = Math.random() * 2.0 + 1.0; // 1~3秒
-    waitUntil = now + delay;
-    message = "准备中...";
-    state = "PREPARE";
+    AStartPrepare(now);
     return;
   }
 
   // PREPARE：抢跑
   if (state === "PREPARE") {
-    state = "TOO_EARLY";
-    bladeflycdEndTime = now + getCdSeconds();
-    playSkillOnce();
-    message = "骗你到了吧~  菜，就多练！ ";
-    waitUntil = now + 0.4;
+    BStartTooEarly(now);
     return;
   }
 
   // RUNNING：成功打断
   if (state === "RUNNING") {
-    stopSound(currentBarSource);
-    currentBarSource = null;
-
-    playSkillOnce();
-
-    reactionTime = now - signalTime;
-    lastReactionMs = Math.round(reactionTime * 1000);
-
-    bladeflycdEndTime = now + getCdSeconds();
-    message = "好断，哥们儿好断! 点屏幕再来！";
-
-    barHitFraction = Math.max(0, Math.min(1, barFraction));
-    barRgb = BAR_COLOR_HIT;
-    barAlpha = 1.0;
-    barFadeActive = true;
-    barFadeStartTime = now;
-
-    state = "RESULT";
+    AHandleBreak(now);
     return;
   }
 
@@ -273,89 +305,117 @@ async function handleAction() {
 
 
 
-// #region ========== 6) 逻辑更新（update：推进状态机/读条/自断/超时/淡出） ==========
-function update() {
-  const now = performance.now() / 1000;
+// #region ========== 6) 逻辑更新（SystemUpdate：推进状态机/读条/自断/超时/淡出） ==========
+function playSkillOnce() {
+  if (!currentJob.skillSound) return;
+  stopSound(currentSkillSource);
+  currentSkillSource = playSound(currentJob.skillSound, false);
+}
 
-  if (state === "PREPARE") {
-    if (bladeflycdEndTime !== null && bladeflycdEndTime > now) {
-      const remain = (bladeflycdEndTime - now).toFixed(1);
-      message = `等待${currentJob.skillname.slice(0, 2)}冷却 ${remain} 秒，随后开始读条...`;
-    } else {
-      message = "准备好…… 我要生太极咯~ ...";
-    }
+function SystemStartRunning(now) {
+  stopSound(currentBarSource);
+  currentBarSource = playSound('bar', false);
 
-    if (now >= waitUntil) {
-      stopSound(currentBarSource);
-      currentBarSource = playSound('bar', false);
+  state = "RUNNING";
+  signalTime = now;
+  startTime = now;
 
-      state = "RUNNING";
-      signalTime = now;
-      startTime  = now;
+  barFraction = 0.0;
+  selfbreak = Math.random() * 1.4 + 0.1;
 
-      barFraction = 0.0;
-      selfbreak = Math.random() * 1.4 + 0.1;
+  // 让区间更友好
+  if (selfbreak >= 0.8 && selfbreak <= 1.1) selfbreak = 1.1;
+}
 
-      // 让区间更友好
-      if (selfbreak >= 0.8 && selfbreak <= 1.1) selfbreak = 1.1;
-    }
+function SystemStartSafeRunning(now) {
+  stopSound(currentBarSource);
+  currentBarSource = playSound('bar', false);
 
-  } else if (state === "TOO_EARLY") {
-    if (now >= waitUntil) {
-      stopSound(currentBarSource);
-      currentBarSource = playSound('bar', false);
+  signalTime = now;
+  startTime = now;
+  barFraction = 0.0;
+  selfbreak = 2.0;
+  state = "SAFE RUNNING";
+}
 
-      signalTime = now;
-      startTime  = now;
-      barFraction = 0.0;
-      selfbreak = 2.0;
-      state = "SAFE RUNNING";
-    }
+function SystemUpdatePrepare(now) {
+  if (bladeflycdEndTime !== null && bladeflycdEndTime > now) {
+    const remain = (bladeflycdEndTime - now).toFixed(1);
+    message = `等待${currentJob.skillname.slice(0, 2)}冷却 ${remain} 秒，随后开始读条...`;
+  } else {
+    message = "准备好…… 我要生太极咯~ ...";
+  }
 
-  } else if (state === "RUNNING" || state === "SAFE RUNNING") {
-    const elapsed = now - startTime;
-    let frac = elapsed / BAR_DURATION;
+  if (now >= waitUntil) {
+    SystemStartRunning(now);
+  }
+}
 
-    if (state === "SAFE RUNNING") {
-      message = `没${currentJob.skillname.slice(0,2)}了吧！ 美美生太极 ${elapsed.toFixed(2)} /0.56`;
-    } else {
-      message = `生太极 ${elapsed.toFixed(2)} /0.56`;
-    }
+function SystemUpdateTooEarly(now) {
+  if (now >= waitUntil) {
+    SystemStartSafeRunning(now);
+  }
+}
 
-    // 自断
-    if (frac >= selfbreak) {
+function SystemUpdateRunning(now) {
+  const elapsed = now - startTime;
+  let frac = elapsed / BAR_DURATION;
+
+  if (state === "SAFE RUNNING") {
+    message = `没${currentJob.skillname.slice(0,2)}了吧？美美生太极${elapsed.toFixed(2)} /0.56`;
+  } else {
+    message = `生太极${elapsed.toFixed(2)} /0.56`;
+  }
+
+  // 自断
+  if (frac >= selfbreak) {
+    stopSound(currentBarSource);
+    currentBarSource = null;
+
+    const delay = Math.random() * 0.6 + 0.2;
+    waitUntil = now + delay;
+    message = `在${elapsed.toFixed(2)}秒时，哥们自断了！~`;
+    frac = 0.0;
+    state = "PREPARE";
+  }
+
+  // 超时
+  if (frac >= 1.0) {
+    frac = 1.0;
+
+    if (reactionTime === null) {
       stopSound(currentBarSource);
       currentBarSource = null;
 
-      const delay = Math.random() * 0.6 + 0.2;
-      waitUntil = now + delay;
-      message = `在${elapsed.toFixed(2)}秒时，哥们自断了！~`;
-      frac = 0.0;
-      state = "PREPARE";
-    }
+      playSound('finish');
 
-    // 超时
-    if (frac >= 1.0) {
-      frac = 1.0;
-
-      if (reactionTime === null) {
-        stopSound(currentBarSource);
-        currentBarSource = null;
-
-        playSound('finish');
-
-        if (state !== "SAFE RUNNING") {
-          message = `这都${currentJob.skillname.slice(0, 2)}不到？菜，就多练 \\(^o^)/~ 再来？`;
-        } else {
-          message = "自断就上钩？菜，就多练 \\(^o^)/~ 再来？";
-        }
-
-        state = "RESULT";
-        reactionTime = null;
+      if (state !== "SAFE RUNNING") {
+        message = `这都${currentJob.skillname.slice(0, 2)}不到？菜，就多练 \\(^o^)/~ 再来？`;
+      } else {
+        message = "自断就上钩？菜，就多练 \\(^o^)/~ 再来？";
       }
-    }
 
-    barFraction = frac;
+      state = "RESULT";
+      reactionTime = null;
+    }
+  }
+
+  barFraction = frac;
+}
+
+function SystemUpdate() {
+  const now = performance.now() / 1000;
+
+  if (bladeflycdEndTime !== null && now >= bladeflycdEndTime) {
+    bladeflycdEndTime = null;
+  }
+
+  if (state === "PREPARE") {
+    SystemUpdatePrepare(now);
+  } else if (state === "TOO_EARLY") {
+    SystemUpdateTooEarly(now);
+  } else if (state === "RUNNING" || state === "SAFE RUNNING") {
+    SystemUpdateRunning(now);
   }
 
   // 红条淡出
@@ -408,17 +468,7 @@ function drawCDFan(x, y, size, fraction) {
   ctx.save();
   ctx.fillStyle = 'rgba(0, 0, 0, 0.63)';
 
-  const points = [
-    { x: cx,     y: y        },
-    { x: x + w,  y: y        },
-    { x: x + w,  y: cy       },
-    { x: x + w,  y: y + h    },
-    { x: cx,     y: y + h    },
-    { x: x,      y: y + h    },
-    { x: x,      y: cy       },
-    { x: x,      y: y        },
-    { x: cx,     y: y        }
-  ];
+  const points = getCDFanPoints(x, y, w, h);
 
   const totalPoints = points.length - 1;
   const endIdx = Math.floor(totalPoints * (1 - fraction));
@@ -440,62 +490,97 @@ function drawCDFan(x, y, size, fraction) {
   ctx.restore();
 }
 
-function draw() {
-  if (layoutDirty) layout();
+const cdFanPointCache = new Map();
 
-  ctx.fillStyle = '#1e1e1e';
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-  const now = performance.now() / 1000;
-
-  // Logo
-  if (Assets.logoLoaded && Assets.logoImg) {
-    try {
-      const aspectRatio = Assets.logoImg.width / Assets.logoImg.height;
-      const logoWidth  = logoHeight * aspectRatio;
-      const logoX = (WIDTH - logoWidth) / 2;
-      const logoY = HEIGHT * 0.05;
-      ctx.drawImage(Assets.logoImg, logoX, logoY, logoWidth, logoHeight);
-    } catch (e) {}
+function getCDFanPoints(x, y, w, h) {
+  const key = `${x},${y},${w},${h}`;
+  let points = cdFanPointCache.get(key);
+  if (!points) {
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    points = [
+      { x: cx,     y: y        },
+      { x: x + w,  y: y        },
+      { x: x + w,  y: cy       },
+      { x: x + w,  y: y + h    },
+      { x: cx,     y: y + h    },
+      { x: x,      y: y + h    },
+      { x: x,      y: cy       },
+      { x: x,      y: y        },
+      { x: cx,     y: y        }
+    ];
+    cdFanPointCache.set(key, points);
   }
+  return points;
+}
 
-  // Skill icon
-  if (Assets.skillLoaded && Assets.skillImg) {
-    try {
-      ctx.drawImage(Assets.skillImg, iconX, iconY, iconSize, iconSize);
-    } catch (e) {
-      ctx.fillStyle = '#4a6fa5';
-      ctx.fillRect(iconX, iconY, iconSize, iconSize);
+function updateLogoAspect() {
+  if (Assets.logoLoaded && Assets.logoImg) {
+    const nextAspect = Assets.logoImg.width / Assets.logoImg.height;
+    if (nextAspect !== logoAspect) {
+      logoAspect = nextAspect;
+      layoutDirty = true;
     }
+  }
+}
+
+function drawLogo() {
+  if (Assets.logoLoaded && Assets.logoImg) {
+    ctx.drawImage(Assets.logoImg, logoX, logoY, logoWidth, logoHeight);
+  }
+}
+
+function drawSkillIcon() {
+  if (Assets.skillLoaded && Assets.skillImg) {
+    ctx.drawImage(Assets.skillImg, iconX, iconY, iconSize, iconSize);
   } else {
-    ctx.fillStyle = '#4a6fa5';
+    ctx.fillStyle = UI.iconFallback;
     ctx.fillRect(iconX, iconY, iconSize, iconSize);
-    ctx.strokeStyle = '#666';
+    ctx.strokeStyle = UI.iconStroke;
     ctx.lineWidth = 2;
     ctx.strokeRect(iconX, iconY, iconSize, iconSize);
   }
+}
 
-  // CD 扇形（用当前职业 CD）
-  let cdFraction = 0.0;
-  if (bladeflycdEndTime !== null) {
-    const cdRemaining = bladeflycdEndTime - now;
-    if (cdRemaining > 0) cdFraction = cdRemaining / getCdSeconds();
-    else bladeflycdEndTime = null;
+function drawCooldownOverlay(target, remaining, total) {
+  let fraction = 0.0;
+  if (remaining > 0) {
+    fraction = remaining / total;
   }
-  drawCDFan(iconX, iconY, iconSize, cdFraction);
+  drawCDFan(target.x, target.y, target.size, fraction);
+}
 
-  // 标题
-  ctx.font = `bold ${titleSize}px "Microsoft YaHei", Arial`;
-  ctx.fillStyle = '#ffffff';
+function drawCooldownOverlays(now) {
+  const iconTarget = { x: iconX, y: iconY, size: iconSize };
+
+  let cdRemaining = 0.0;
+  if (bladeflycdEndTime !== null) {
+    cdRemaining = bladeflycdEndTime - now;
+  }
+  drawCooldownOverlay(iconTarget, cdRemaining, getCdSeconds());
+}
+
+function drawCastBar() {
+  ctx.fillStyle = UI.barBg;
+  drawRoundedRect(barXAdj, barY, barWidth, barHeight, 8);
+
+  const drawFrac = barFadeActive ? barHitFraction : barFraction;
+  if (drawFrac > 0) {
+    ctx.fillStyle = `rgba(${barRgb}, ${barAlpha})`;
+    drawRoundedRect(barXAdj, barY, barWidth * drawFrac, barHeight, 8);
+  }
+}
+
+function drawTexts() {
+  ctx.font = titleFont;
+  ctx.fillStyle = UI.textMain;
   ctx.textAlign = 'center';
-  ctx.fillText('折磨气纯模拟器v1.6', WIDTH / 2, HEIGHT * 0.25);
+  ctx.fillText(UI.title, WIDTH / 2, HEIGHT * 0.25);
 
-  // message
-  ctx.font = `${msgSize}px "Microsoft YaHei", Arial`;
-  ctx.fillStyle = '#dcdcdc';
+  ctx.font = msgFont;
+  ctx.fillStyle = UI.textSub;
   ctx.fillText(message, WIDTH / 2, HEIGHT * 0.36);
 
-  // 结果行
   let text;
   if (state === "RESULT") {
     if (reactionTime !== null) text = `本次反应时间：${(reactionTime * 1000).toFixed(1)} ms`;
@@ -506,20 +591,34 @@ function draw() {
     text = "本次反应时间：-- ms";
   }
 
-  ctx.font = `${resultSize}px "Microsoft YaHei", Arial`;
-  ctx.fillStyle = '#ffff00';
+  ctx.font = resultFont;
+  ctx.fillStyle = UI.textResult;
   ctx.fillText(text, WIDTH / 2, HEIGHT * 0.85);
+}
 
-  // 进度条背景
-  ctx.fillStyle = '#505050';
-  drawRoundedRect(barXAdj, barY, barWidth, barHeight, 8);
+function draw() {
+  updateLogoAspect();
+  if (layoutDirty) layout();
 
-  // 进度条填充
-  let drawFrac = barFadeActive ? barHitFraction : barFraction;
-  if (drawFrac > 0) {
-    ctx.fillStyle = `rgba(${barRgb}, ${barAlpha})`;
-    drawRoundedRect(barXAdj, barY, barWidth * drawFrac, barHeight, 8);
-  }
+  ctx.fillStyle = UI.bg;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  const now = performance.now() / 1000;
+
+  // Logo
+  drawLogo();
+
+  // Skill icon
+  drawSkillIcon();
+
+  // CD
+  drawCooldownOverlays(now);
+
+  // Text
+  drawTexts();
+
+  // Cast bar
+  drawCastBar();
 }
 // #endregion
 
@@ -527,10 +626,12 @@ function draw() {
 
 // #region ========== 8) 主循环（gameLoop） ==========
 function gameLoop() {
-  update();
+  SystemUpdate();
   draw();
   requestAnimationFrame(gameLoop);
 }
 
 gameLoop();
 // #endregion
+
+

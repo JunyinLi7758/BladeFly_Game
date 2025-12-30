@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>2P Test</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="job-select">
+            <button class="job-btn" onclick="location.href='index.html'">返回模式选择</button>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="info">
+            A: a准备 s读条 d取消 | B: j准备 k打断 | 鼠标点击= A读条
+        </div>
+    </div>
+
+    <script type="module" src="./game_2players.js"></script>
+</body>
+</html>
