@@ -13,31 +13,25 @@
              <button class="job-btn" onclick="location.href='index.html'">
                 ← 模式选择
             </button>
+            <label class="job-btn" style="display:flex;align-items:center;gap:6px;">
+                房间:
+                <input id="roomIdInput" type="text" value="default" style="width:100px;margin-left:6px;" />
+                <button id="btnJoinRoom" class="job-btn" style="margin-left:6px;">加入</button>
+            </label>
             <button class="job-btn" data-job="Blade">剑纯</button>
             <button class="job-btn" data-job="Flower">万花</button>
             <button class="job-btn" data-job="Toxic">五毒</button>
-            <label class="job-btn" style="display:flex;align-items:center;gap:6px;">
-                <input id="aComToggle" type="checkbox" />
-                A COM
-            </label>
-            <label class="job-btn" style="display:flex;align-items:center;gap:6px;">
-                <input id="bComToggle" type="checkbox" />
-                B COM
-            </label>
+            <!-- COM toggles removed (use keyboard 1/2 to toggle if needed) -->
         </div>
 
         <canvas id="gameCanvas"></canvas>
 
-        <div class="job-select" style="top:auto;bottom:70px;left:10px;">
-            <button class="job-btn" id="btnAReady">A Ready</button>
-            <button class="job-btn" id="btnAStart">A Start</button>
-            <button class="job-btn" id="btnACancel">A Cancel</button>
-            <button class="job-btn" id="btnBReady">B Ready</button>
-            <button class="job-btn" id="btnBInterrupt">B Interrupt</button>
-        </div>
+        <!-- External control buttons removed; use screen/touch/keyboard instead -->
 
         <div class="info">
-            A: a准备 s读条 d取消 | B: j准备 k打断 | 鼠标点击= A读条
+            <div id="status">状态: 未连接</div>
+            <div id="playerInfo">玩家信息</div>
+            <div id="gameInfo">游戏信息</div>
         </div>
     </div>
 

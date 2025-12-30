@@ -168,11 +168,13 @@ let bState = BState.NO_CD;
 let message = '2P mode';
 
 // WS
-const ROOM_ID = 'default';
+let ROOM_ID = (new URLSearchParams(location.search)).get('room') || 'default';
 const WS_URL = `ws://${location.hostname}:8080`;
 let ws = null;
 let wsConnected = false;
 let wsRole = null;
+let roomInputEl = null;
+let btnJoinRoomEl = null;
 
 // Time
 let startTime = null;
@@ -495,18 +497,7 @@ function connectWS() {
 }
 
 // ====== Input: 按键与画布长按/短按逻辑 ======
-let aComToggleEl = null;
-let bComToggleEl = null;
-let btnAReady = null;
-let btnAStart = null;
-let btnACancel = null;
-let btnBReady = null;
-let btnBInterrupt = null;
-
-function syncComToggles() {
-  if (aComToggleEl) aComToggleEl.checked = aComMode;
-  if (bComToggleEl) bComToggleEl.checked = bComMode;
-}
+let recentLongPress = 0; // seconds, used to avoid double-triggering click after long-press
 
 // Canvas press handling: 长按触发 A start_cast，松开触发 cancel；短按作为打断（B）或准备（A）
 function setupCanvasInput() {
@@ -524,6 +515,7 @@ function setupCanvasInput() {
     longPressTimer = setTimeout(() => {
       longPressFired = true;
       const now = performance.now() / 1000;
+      recentLongPress = now;
       // 只有 A 发起读条（服务器会忽略无效角色）
       AStartCasting(now);
     }, LONG_MS);
@@ -535,6 +527,7 @@ function setupCanvasInput() {
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
     if (longPressFired) {
       // 长按后松开 -> 取消读条
+      recentLongPress = now;
       ACancelCasting(now);
       longPressFired = false;
     } else {
@@ -569,35 +562,39 @@ function setupCanvasInput() {
 
 // 按钮与开关绑定
 window.addEventListener('DOMContentLoaded', () => {
-  aComToggleEl = document.getElementById('aComToggle');
-  bComToggleEl = document.getElementById('bComToggle');
-  btnAReady = document.getElementById('btnAReady');
-  btnAStart = document.getElementById('btnAStart');
-  btnACancel = document.getElementById('btnACancel');
-  btnBReady = document.getElementById('btnBReady');
-  btnBInterrupt = document.getElementById('btnBInterrupt');
+  roomInputEl = document.getElementById('roomIdInput');
+  btnJoinRoomEl = document.getElementById('btnJoinRoom');
 
-  if (aComToggleEl) {
-    aComToggleEl.addEventListener('change', () => {
-      ASetComMode(aComToggleEl.checked);
-      syncComToggles();
+  // 初始化房间输入值
+  if (roomInputEl) roomInputEl.value = ROOM_ID || 'default';
+  function joinRoomById(id) {
+    const newRoom = id && id.trim() ? id.trim() : 'default';
+    // If already connected, close previous connection first
+    if (ws) {
+      try {
+        ws.close();
+      } catch (e) { /* ignore */ }
+      ws = null;
+      wsConnected = false;
+      wsRole = null;
+    }
+    ROOM_ID = newRoom;
+    connectWS();
+  }
+
+  if (btnJoinRoomEl) {
+    btnJoinRoomEl.addEventListener('click', () => {
+      const v = (roomInputEl && roomInputEl.value) ? roomInputEl.value.trim() : '';
+      joinRoomById(v);
     });
   }
 
-  if (bComToggleEl) {
-    bComToggleEl.addEventListener('change', () => {
-      BSetComMode(bComToggleEl.checked);
-      syncComToggles();
-    });
+  // 若通过 URL 指定房间，则自动加入
+  if (ROOM_ID && ROOM_ID !== 'default') {
+    connectWS();
   }
 
-  if (btnAReady) btnAReady.addEventListener('click', () => AReady());
-  if (btnAStart) btnAStart.addEventListener('click', () => AStartCasting(performance.now() / 1000));
-  if (btnACancel) btnACancel.addEventListener('click', () => ACancelCasting(performance.now() / 1000));
-  if (btnBReady) btnBReady.addEventListener('click', () => BReady());
-  if (btnBInterrupt) btnBInterrupt.addEventListener('click', () => BInterrupt(performance.now() / 1000));
-
-  syncComToggles();
+  // no external control buttons — use canvas/touch/keyboard inputs
   setupCanvasInput();
 });
 
@@ -608,11 +605,9 @@ window.addEventListener('keydown', (e) => {
 
   if (e.key === '1') {
     ASetComMode(!aComMode);
-    syncComToggles();
   }
   if (e.key === '2') {
     BSetComMode(!bComMode);
-    syncComToggles();
   }
 
   if (!aComMode) {
@@ -624,6 +619,31 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'k') BInterrupt(now);
   }
 });
+
+// 屏幕任意点击也能进入准备（但忽略按钮/输入上的点击；并避免与长按冲突）
+let lastGlobalReadyTime = 0;
+function tryGlobalReady(e, isTouch = false) {
+  const tag = (e && e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
+  if (['BUTTON', 'INPUT', 'LABEL', 'A', 'SELECT', 'TEXTAREA'].includes(tag)) return;
+  const now = performance.now() / 1000;
+  if (now - recentLongPress < 0.6) return; // 忽略紧接着的 click（来自长按）
+  if (now - lastGlobalReadyTime < 0.6) return; // 防止 touchend + click 双触发
+
+  if (![SystemState.IDLE, SystemState.AWIN, SystemState.BWIN].includes(systemState)) return;
+
+  lastGlobalReadyTime = now;
+  if (wsConnected) {
+    if (wsRole === 'A' && !aComMode) AReady();
+    if (wsRole === 'B' && !bComMode) BReady();
+  } else {
+    AReady();
+  }
+
+  if (isTouch && e && e.cancelable) e.preventDefault();
+}
+
+window.addEventListener('click', (e) => tryGlobalReady(e, false));
+window.addEventListener('touchend', (e) => tryGlobalReady(e, true), { passive: false });
 
 
 // #region ========== 7) 绘制系统（draw + 绘制工具函数）=========
@@ -776,21 +796,30 @@ function drawTexts() {
 
   let text;
   if (systemState === SystemState.AWIN) {
-    text = 'A WIN';
+    text = '读完咯！';
   } else if (systemState === SystemState.BWIN) {
-    text = 'B WIN';
-  } else {
-    text = `System: ${systemState} | A: ${aState} | B: ${bState}`;
+    text = '飞到咯！';
+  } else if (systemState === SystemState.PREPARE) {
+    text = '准备中...';
+  } else {    
+    text = `游戏开始！`;
   }
 
   ctx.font = resultFont;
   ctx.fillStyle = UI.textResult;
-  ctx.fillText(text, WIDTH / 2, HEIGHT * 0.85);
+  ctx.fillText(text, WIDTH / 2, HEIGHT * 0.82);
+
+  // A/B ready 状态显示
+  ctx.font = '14px "Microsoft YaHei", Arial';
+  ctx.fillStyle = '#9f9';
+  const aReadyMark = aReady ? '✓' : '-';
+  const bReadyMark = bReady ? '✓' : '-';
+  ctx.fillText(`A Ready: ${aReadyMark}    B Ready: ${bReadyMark}`, WIDTH / 2, HEIGHT * 0.88);
 
   ctx.font = '12px "Microsoft YaHei", Arial';
   ctx.fillStyle = '#8aa';
   const wsState = wsConnected ? `ON${wsRole ? `(${wsRole})` : ''}` : 'OFF';
-  ctx.fillText(`WS: ${wsState} | ${systemState}`, WIDTH / 2, HEIGHT * 0.9);
+  ctx.fillText(`WS: ${wsState}`, WIDTH / 2, HEIGHT * 0.93);
 }
 
 function draw() {
@@ -827,5 +856,8 @@ function gameLoop() {
   requestAnimationFrame(gameLoop);
 }
 
-connectWS();
+// Start rendering loop
+gameLoop();
+
+// Note: connectWS() is invoked when user clicks "加入" or when a room is provided via URL.
 gameLoop();

@@ -4,7 +4,7 @@ const http = require('http');
 const WebSocket = require('ws');
 
 const PORT = 8080;
-const TICK_MS = 50;
+const TICK_MS = 15;
 const PREPARE_SECONDS = 3.0;
 const CAST_DURATION = 0.63;
 const B_CD_SECONDS = 3.0;
