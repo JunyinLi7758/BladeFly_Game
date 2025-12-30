@@ -494,8 +494,7 @@ function connectWS() {
   });
 }
 
-// ====== Input (placeholder) ======
-// Hook your input/UI to call AReady/BReady/AStartCasting/ACancelCasting/BInterrupt.
+// ====== Input: 按键与画布长按/短按逻辑 ======
 let aComToggleEl = null;
 let bComToggleEl = null;
 let btnAReady = null;
@@ -509,6 +508,66 @@ function syncComToggles() {
   if (bComToggleEl) bComToggleEl.checked = bComMode;
 }
 
+// Canvas press handling: 长按触发 A start_cast，松开触发 cancel；短按作为打断（B）或准备（A）
+function setupCanvasInput() {
+  if (!canvas) return;
+
+  const LONG_MS = 250;
+  let longPressTimer = null;
+  let longPressFired = false;
+
+  function startPress(e) {
+    // 阻止触摸引发的滚动/点击
+    if (e.cancelable) e.preventDefault();
+    longPressFired = false;
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    longPressTimer = setTimeout(() => {
+      longPressFired = true;
+      const now = performance.now() / 1000;
+      // 只有 A 发起读条（服务器会忽略无效角色）
+      AStartCasting(now);
+    }, LONG_MS);
+  }
+
+  function endPress(e) {
+    if (e && e.cancelable) e.preventDefault();
+    const now = performance.now() / 1000;
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    if (longPressFired) {
+      // 长按后松开 -> 取消读条
+      ACancelCasting(now);
+      longPressFired = false;
+    } else {
+      // 短按：如果是 B 则触发打断；否则视为准备（单击准备）
+      if (wsConnected) {
+        if (wsRole === 'B' && !bComMode) {
+          BInterrupt(now);
+        } else if (wsRole === 'A' && !aComMode) {
+          // 单击准备（若在 IDLE）或短按不触发读条
+          if (systemState === SystemState.IDLE) AReady();
+        }
+      } else {
+        // 本地模式：单击作为 A 的准备或短按触发 AStart
+        if (systemState === SystemState.IDLE) {
+          AReady();
+        } else {
+          // 若想在本地短按也触发打断，请改为 BInterrupt
+        }
+      }
+    }
+  }
+
+  // 鼠标
+  canvas.addEventListener('mousedown', startPress);
+  window.addEventListener('mouseup', endPress);
+
+  // 触摸
+  canvas.addEventListener('touchstart', startPress, { passive: false });
+  canvas.addEventListener('touchend', endPress);
+  canvas.addEventListener('touchcancel', endPress);
+}
+
+// 按钮与开关绑定
 window.addEventListener('DOMContentLoaded', () => {
   aComToggleEl = document.getElementById('aComToggle');
   bComToggleEl = document.getElementById('bComToggle');
@@ -539,8 +598,10 @@ window.addEventListener('DOMContentLoaded', () => {
   if (btnBInterrupt) btnBInterrupt.addEventListener('click', () => BInterrupt(performance.now() / 1000));
 
   syncComToggles();
+  setupCanvasInput();
 });
 
+// 键盘快捷键：单击准备 a/j，取消 d，打断 k
 window.addEventListener('keydown', (e) => {
   if (e.repeat) return;
   const now = performance.now() / 1000;
@@ -555,44 +616,13 @@ window.addEventListener('keydown', (e) => {
   }
 
   if (!aComMode) {
-    if (e.key === 'a') AReady();
-    if (e.key === 's') AStartCasting(now);
+    if (e.key === 'a' || e.key === 'j') AReady();
     if (e.key === 'd') ACancelCasting(now);
   }
 
   if (!bComMode) {
-    if (e.key === 'j') BReady();
     if (e.key === 'k') BInterrupt(now);
   }
-});
-
-function handleTap(now) {
-  if (!wsConnected) return;
-  if (aComMode && bComMode) return;
-
-  if (wsRole === 'A' && !aComMode) {
-    if (systemState === SystemState.IDLE) {
-      AReady();
-    } else if (systemState === SystemState.RUNNING) {
-      AStartCasting(now);
-    }
-    return;
-  }
-
-  if (wsRole === 'B' && !bComMode) {
-    BInterrupt(now);
-  }
-}
-
-window.addEventListener('mousedown', () => {
-  const now = performance.now() / 1000;
-  handleTap(now);
-});
-
-window.addEventListener('touchstart', (e) => {
-  e.preventDefault();
-  const now = performance.now() / 1000;
-  handleTap(now);
 });
 
 
