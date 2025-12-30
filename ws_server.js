@@ -168,6 +168,15 @@ wss.on('connection', (ws) => {
       return;
     }
 
+    // simple ping/pong for clock sync: client sends {type:'ping', clientSent}
+    if (msg.type === 'ping') {
+      const serverNow = nowSec();
+      try {
+        ws.send(JSON.stringify({ type: 'pong', clientSent: msg.clientSent, serverNow }));
+      } catch (e) { }
+      return;
+    }
+
     if (!room || !role) return;
     if (msg.type === 'input') {
       handleInput(room, role, msg.action);
@@ -191,7 +200,7 @@ setInterval(() => {
       bReady: room.bReady,
       barFraction: room.barFraction,
       bCdEndTime: room.bCdEndTime,
-      bCdRemaining: room.bCdEndTime !== null ? Math.max(0, room.bCdEndTime - nowSec()) : 0
+      bCdRemaining: room.bCdEndTime !== null ? 2 : Math.max(1, room.bCdEndTime - nowSec()) 
     });
   }
 }, TICK_MS);

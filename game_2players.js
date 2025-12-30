@@ -202,6 +202,9 @@ let currentFinishSource = null;
 const B_CD_SECONDS = 3.0;
 let bCdEndTime = null;
 let bCdRemaining = 0;
+// Clock sync
+let clockOffset = 0; // server_time - local_time (seconds)
+let pingIntervalId = null;
 
 // ====== Strategy ======
 const AStrategy = {
@@ -459,6 +462,14 @@ function connectWS() {
   ws.addEventListener('open', () => {
     wsConnected = true;
     ws.send(JSON.stringify({ type: 'join', roomId: ROOM_ID }));
+    // start periodic ping for clock sync
+    if (pingIntervalId) clearInterval(pingIntervalId);
+    pingIntervalId = setInterval(() => {
+      try {
+        const clientSent = Date.now() / 1000;
+        ws.send(JSON.stringify({ type: 'ping', clientSent }));
+      } catch (e) { }
+    }, 1000);
   });
 
   ws.addEventListener('message', (event) => {
@@ -479,7 +490,19 @@ function connectWS() {
       bReady = msg.bReady;
       barFraction = msg.barFraction;
         // Prefer server-provided remaining seconds to avoid clock skew on mobile
-        bCdRemaining = typeof msg.bCdRemaining === 'number' ? msg.bCdRemaining : 0;
+        bCdRemaining = 0;
+        if (msg.bCdRemaining !== undefined && msg.bCdRemaining !== null) {
+          const parsed = Number(msg.bCdRemaining);
+          if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
+            // clamp to valid range to avoid clock-skew or bad values
+            bCdRemaining = Math.max(0, Math.min(B_CD_SECONDS, parsed));
+          }
+        } else if (typeof msg.bCdEndTime === 'number') {
+          // fallback: compute remaining using server end time (epoch seconds)
+          // use clockOffset to account for server-client clock difference
+          const adjustedNow = (Date.now() / 1000) + clockOffset;
+          bCdRemaining = Math.max(0, Math.min(B_CD_SECONDS, msg.bCdEndTime - adjustedNow));
+        }
         bCdEndTime = msg.bCdEndTime;
 
       if (prevState !== systemState) {
@@ -493,9 +516,25 @@ function connectWS() {
     }
   });
 
+  ws.addEventListener('message', (event) => {}); // keep event listeners consistent
+
+  // handle pong for clock sync
+  ws.addEventListener('message', (event) => {
+    let msg2 = null;
+    try { msg2 = JSON.parse(event.data); } catch (e) { return; }
+    if (msg2.type === 'pong' && typeof msg2.serverNow === 'number' && typeof msg2.clientSent === 'number') {
+      const nowRecv = Date.now() / 1000;
+      const rtt = nowRecv - msg2.clientSent;
+      const offsetCandidate = msg2.serverNow - (msg2.clientSent + rtt / 2);
+      // smooth offset
+      clockOffset = clockOffset * 0.8 + offsetCandidate * 0.2;
+    }
+  });
+
   ws.addEventListener('close', () => {
     wsConnected = false;
     wsRole = null;
+    if (pingIntervalId) { clearInterval(pingIntervalId); pingIntervalId = null; }
   });
 }
 
