@@ -167,6 +167,13 @@ let aState = AState.NO_CASTING;
 let bState = BState.NO_CD;
 let message = '2P mode';
 
+// WS
+const ROOM_ID = 'default';
+const WS_URL = `ws://${location.hostname}:8080`;
+let ws = null;
+let wsConnected = false;
+let wsRole = null;
+
 // Time
 let startTime = null;
 let prepareStartTime = null;
@@ -222,6 +229,10 @@ function BUpdateStrategyRandom() {
 
 // ====== A system ======
 function AReady() {
+  if (wsConnected) {
+    sendInput('ready');
+    return;
+  }
   aReady = true;
 }
 
@@ -232,6 +243,10 @@ function ASetComMode(enabled) {
 
 function AStartCasting(now) {
   if (systemState !== SystemState.RUNNING) return;
+  if (wsConnected) {
+    sendInput('start_cast');
+    return;
+  }
   aState = AState.CASTING;
   startTime = now;
   barFraction = 0.0;
@@ -242,6 +257,10 @@ function AStartCasting(now) {
 
 function ACancelCasting(now) {
   if (systemState !== SystemState.RUNNING) return;
+  if (wsConnected) {
+    sendInput('cancel_cast');
+    return;
+  }
   aState = AState.NO_CASTING;
   barFraction = 0.0;
   aCancelUntil = now + AStrategy.cancelCooldown;
@@ -266,6 +285,10 @@ function showInterruptBar(now) {
 
 // ====== B system ======
 function BReady() {
+  if (wsConnected) {
+    sendInput('ready');
+    return;
+  }
   bReady = true;
 }
 
@@ -276,6 +299,10 @@ function BSetComMode(enabled) {
 
 function BInterrupt(now) {
   if (bCdEndTime !== null && now < bCdEndTime) return;
+  if (wsConnected) {
+    sendInput('interrupt');
+    return;
+  }
 
   if (systemState === SystemState.RUNNING && aState === AState.CASTING) {
     systemState = SystemState.BWIN;
@@ -381,6 +408,7 @@ function UpdateBStrategy(now) {
 }
 
 function SystemUpdate() {
+  if (wsConnected) return;
   const now = performance.now() / 1000;
 
   if (systemState === SystemState.AWIN || systemState === SystemState.BWIN) {
@@ -412,10 +440,69 @@ function stopAllSounds() {
   currentFinishSource = null;
 }
 
+function sendInput(action) {
+  if (!wsConnected || !ws) return;
+  ws.send(JSON.stringify({ type: 'input', action }));
+}
+
+function connectWS() {
+  try {
+    ws = new WebSocket(WS_URL);
+  } catch (e) {
+    console.warn('WS init failed', e);
+    return;
+  }
+
+  ws.addEventListener('open', () => {
+    wsConnected = true;
+    ws.send(JSON.stringify({ type: 'join', roomId: ROOM_ID }));
+  });
+
+  ws.addEventListener('message', (event) => {
+    let msg = null;
+    try { msg = JSON.parse(event.data); } catch (e) { return; }
+
+    if (msg.type === 'joined') {
+      wsRole = msg.role || null;
+      return;
+    }
+
+    if (msg.type === 'state') {
+      const prevState = systemState;
+      systemState = msg.systemState;
+      aState = msg.aState;
+      bState = msg.bState;
+      aReady = msg.aReady;
+      bReady = msg.bReady;
+      barFraction = msg.barFraction;
+      bCdEndTime = msg.bCdEndTime;
+
+      if (prevState !== systemState) {
+        if (systemState === SystemState.RUNNING) {
+          resetBarVisuals();
+        }
+        if (systemState === SystemState.BWIN && prevState === SystemState.RUNNING) {
+          showInterruptBar(performance.now() / 1000);
+        }
+      }
+    }
+  });
+
+  ws.addEventListener('close', () => {
+    wsConnected = false;
+    wsRole = null;
+  });
+}
+
 // ====== Input (placeholder) ======
 // Hook your input/UI to call AReady/BReady/AStartCasting/ACancelCasting/BInterrupt.
 let aComToggleEl = null;
 let bComToggleEl = null;
+let btnAReady = null;
+let btnAStart = null;
+let btnACancel = null;
+let btnBReady = null;
+let btnBInterrupt = null;
 
 function syncComToggles() {
   if (aComToggleEl) aComToggleEl.checked = aComMode;
@@ -425,6 +512,11 @@ function syncComToggles() {
 window.addEventListener('DOMContentLoaded', () => {
   aComToggleEl = document.getElementById('aComToggle');
   bComToggleEl = document.getElementById('bComToggle');
+  btnAReady = document.getElementById('btnAReady');
+  btnAStart = document.getElementById('btnAStart');
+  btnACancel = document.getElementById('btnACancel');
+  btnBReady = document.getElementById('btnBReady');
+  btnBInterrupt = document.getElementById('btnBInterrupt');
 
   if (aComToggleEl) {
     aComToggleEl.addEventListener('change', () => {
@@ -439,6 +531,12 @@ window.addEventListener('DOMContentLoaded', () => {
       syncComToggles();
     });
   }
+
+  if (btnAReady) btnAReady.addEventListener('click', () => AReady());
+  if (btnAStart) btnAStart.addEventListener('click', () => AStartCasting(performance.now() / 1000));
+  if (btnACancel) btnACancel.addEventListener('click', () => ACancelCasting(performance.now() / 1000));
+  if (btnBReady) btnBReady.addEventListener('click', () => BReady());
+  if (btnBInterrupt) btnBInterrupt.addEventListener('click', () => BInterrupt(performance.now() / 1000));
 
   syncComToggles();
 });
@@ -468,9 +566,33 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+function handleTap(now) {
+  if (!wsConnected) return;
+  if (aComMode && bComMode) return;
+
+  if (wsRole === 'A' && !aComMode) {
+    if (systemState === SystemState.IDLE) {
+      AReady();
+    } else if (systemState === SystemState.RUNNING) {
+      AStartCasting(now);
+    }
+    return;
+  }
+
+  if (wsRole === 'B' && !bComMode) {
+    BInterrupt(now);
+  }
+}
+
 window.addEventListener('mousedown', () => {
   const now = performance.now() / 1000;
-  if (!aComMode) AStartCasting(now);
+  handleTap(now);
+});
+
+window.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const now = performance.now() / 1000;
+  handleTap(now);
 });
 
 
@@ -635,11 +757,10 @@ function drawTexts() {
   ctx.fillStyle = UI.textResult;
   ctx.fillText(text, WIDTH / 2, HEIGHT * 0.85);
 
-  // Debug line (disabled)
-  // ctx.font = '12px "Microsoft YaHei", Arial';
-  // ctx.fillStyle = '#88a';
-  // const src = Assets.skillImg ? Assets.skillImg.src : '(no image)';
-  // ctx.fillText(`icon: ${currentJob?.icon || 'none'} | src: ${src || 'empty'}`, WIDTH / 2, HEIGHT * 0.9);
+  ctx.font = '12px "Microsoft YaHei", Arial';
+  ctx.fillStyle = '#8aa';
+  const wsState = wsConnected ? `ON${wsRole ? `(${wsRole})` : ''}` : 'OFF';
+  ctx.fillText(`WS: ${wsState} | ${systemState}`, WIDTH / 2, HEIGHT * 0.9);
 }
 
 function draw() {
@@ -676,4 +797,5 @@ function gameLoop() {
   requestAnimationFrame(gameLoop);
 }
 
+connectWS();
 gameLoop();
