@@ -188,19 +188,6 @@ async function onPressEnd() {
 }
 
 
-
-// window.addEventListener('keydown', async (e) => {
-//   if (e.key === 'Escape') {
-//     state = "READY";
-//     return;
-//   }
-//   if (e.key === ' ' || e.key === 'Enter') {
-//     e.preventDefault();
-//     await handleAction();
-//   }
-// });
-
-
 window.addEventListener('keydown', (e) => {
   if (e.repeat) return; // 防止长按键盘反复触发
 
@@ -222,11 +209,6 @@ window.addEventListener('keyup', async (e) => {
   }
 });
 
-
-// canvas.addEventListener('click', async () => {
-//   await handleAction();
-// });
-
 canvas.addEventListener('mousedown', (e) => {
   e.preventDefault();
   onPressStart();
@@ -236,22 +218,6 @@ canvas.addEventListener('mouseup', async (e) => {
   e.preventDefault();
   await onPressEnd();
 });
-
-// canvas.addEventListener('touchstart', (e) => {
-//   e.preventDefault();
-//   touchStartTime = Date.now();
-//     handleAction();
-// });
-
-// canvas.addEventListener('touchend', async (e) => {
-//   e.preventDefault();
-//   const touchDuration = Date.now() - touchStartTime;
-//   if (touchDuration > LONG_PRESS_TIME) {
-//     state = "READY";
-//   } else {
-//     await handleAction();
-//   }
-// });
 
 canvas.addEventListener('touchstart', (e) => {
   e.preventDefault();
@@ -293,21 +259,11 @@ try {
 
 
 // #region ========== 5) 动作处理（原 handleSpaceKey：统一入口 handleAction）==========
-function playSkillOnce() {
-  if (!currentJob.skillSound) return;
-  stopSound(currentSkillSource);
-  currentSkillSource = playSound(currentJob.skillSound, false);
-}
 
-function resetBarVisuals() {
-  barRgb = BAR_COLOR_NORMAL;
-  barAlpha = 1.0;
-  barFadeActive = false;
-  barHitFraction = 0;
-}
+//#region ========== 5.1) 读条动作A（玩家读条相关）=========
 
-function startCasting(now) {
-  resetBarVisuals();
+function AStartCasting(now) {
+  SystemResetBarVisuals();
   barFraction = 0.0;
   startTime = now;
   taichiendtime = TAICHI_LAST_TIME + startTime;
@@ -317,79 +273,14 @@ function startCasting(now) {
   currentBarSource = playSound('bar', false);
 }
 
-function planEnemyBreakOnStart() {
-  enemyBreakFrac = Math.random() * 0.9 - 0.1;      // 0.35~0.85
-  enemyReactSec  = -Math.random() * 0.3 + 0.4;     // 0.10~0.25s
-  enemyInterruptAt = null;
-}
-
-function planEnemyBreakOnResume() {
-  enemyBreakFrac = Math.random() * 0.9 - 0.05;     // 0.35~0.85
-  enemyReactSec = enemyReactSec * 0.6;
-}
-
-function cancelCasting() {
+function ACancelCasting() {
   reactionTime = barFraction * BAR_DURATION; // 被断时刻（用于显示）
   barFraction = 0.0;
   message = "骗出来了吗？注意听声音！";
   state = "PAUSE";
 }
 
-async function handleAction() {
-  const now = performance.now() / 1000;
-
-  // 移动端音频解锁（如果你还在用 audio.js 模块版就调用 unlockAudio();）
-  // await unlockAudio();
-
-  const enemyOnCd = (enemyCdEndTime !== null && now < enemyCdEndTime);
-//   console.log("当前状态", state, "敌方CD吗", enemyOnCd);
-
-  // RESULT / READY：开始读条
-  if (state === "READY" || state === "RESULT") {
-    if (enemyOnCd) {  
-        return;
-        }
-    // 如果敌方不在CD：生成“断点反应时间+打断时刻”
-    if (!enemyOnCd) {
-      planEnemyBreakOnStart();
-      // console.log("敌方断点设为", enemyBreakFrac.toFixed(3),
-      //   "反应时间设为", enemyReactSec.toFixed(3), "秒);  
-      // message = "开始读条，剑飞";
-    } else {
-      enemyBreakFrac = null;
-      enemyReactSec = null;
-      enemyInterruptAt = null;
-      message = "敌方在CD！稳稳读完就赢啦~;"
-    }
-    
-    // 播放读条音效（可选）
-    startCasting(now);
-    return;
-  }
-  else if (state === "PAUSE") {
-    // enemyBreakFrac += 0.4* (0.9-enemyBreakFrac);
-    planEnemyBreakOnResume();
-    // console.log("敌方断点设为", enemyBreakFrac.toFixed(3),
-    //   "反应时间设为", enemyReactSec.toFixed(3), "秒);  
-
-    // 播放读条音效（可选）
-    startCasting(now);
-    return;  
-    }
-  // CASTING：点击取消读条（骗断）
-
-  else if (state === "CASTING") {
-    // 取消读条：进度归零（也可以保留显示，但更像“停手”就归零）
-    cancelCasting();
-    return;
-  }
-}
-
-// #endregion
-
-
-
-function finishCasting() {
+function AFinishCasting() {
   barFraction = 1.0;
   message = `牛逼，你骗到 ${currentJob.name}了！点一下重开。`;
   state = "RESULT";
@@ -397,9 +288,22 @@ function finishCasting() {
   currentBarSource = null;
   playSound('finish', false);
 }
+//#endregion
 
-function interruptCasting(now, elapsed) {
-  playSkillOnce();
+//#region ========== 5.2) 读条动作B（敌方打断相关）=========
+function BPlanInterruptOnStart() {
+  enemyBreakFrac = Math.random() * 0.9 - 0.1;      // 0.35~0.85
+  enemyReactSec  = -Math.random() * 0.3 + 0.4;     // 0.10~0.25s
+  enemyInterruptAt = null;
+}
+
+function BPlanInterruptOnResume() {
+  enemyBreakFrac = Math.random() * 0.9 - 0.05;     // 0.35~0.85
+  enemyReactSec = enemyReactSec * 0.6;
+}
+
+function BInterruptCasting(now, elapsed) {
+  SystemPlaySkillOnce();
 
   enemyCdEndTime = now + BLADEFLY_CD; // 你也可以单独设 ENEMY_CD
   enemyInterruptAt = null;
@@ -418,43 +322,63 @@ function interruptCasting(now, elapsed) {
   // playSound('skill_xxx') 可选
 }
 
-function updateCasting(now, enemyOnCd) {
+function BStartPause(now) {
+  SystemPlaySkillOnce();
+  enemyCdEndTime = now + BLADEFLY_CD; // 你也可以单独设 ENEMY_CD
+  enemyInterruptAt = null;
+}
+//#endregion
+
+//#region ========== 5.3) 系统更新（读条推进/敌方打断/结果处理）=========
+function SystemPlaySkillOnce() {
+  if (!currentJob.skillSound) return;
+  stopSound(currentSkillSource);
+  currentSkillSource = playSound(currentJob.skillSound, false);
+}
+
+function SystemResetBarVisuals() {
+  barRgb = BAR_COLOR_NORMAL;
+  barAlpha = 1.0;
+  barFadeActive = false;
+  barHitFraction = 0;
+}
+
+function SystemUpdateCasting(now, enemyOnCd) {
   const elapsed = now - startTime;
 
   const frac = elapsed / BAR_DURATION;
   message = `生太极${(elapsed).toFixed(2)} / 0.56`;
+  barFraction = frac;
 
+
+  // 读条完成
   if (frac >= 1.0) {
-    finishCasting();
+    AFinishCasting();
     return;
   }
 
+  // 敌方不在CD，且还没定打断时刻：计算打断时刻
   if (enemyInterruptAt == null && frac >= enemyBreakFrac && !enemyOnCd) {
     enemyInterruptAt = enemyBreakFrac * BAR_DURATION + enemyReactSec;
-    // console.log(now,startTime,"敌方计划打断时刻设为", enemyInterruptAt);
   }
-
-  barFraction = frac;
 
   // 敌方不在CD，且到了计划打断时刻：如果你还在读条 -> 失败并进入敌方CD
   if (!enemyOnCd && enemyInterruptAt !== null && elapsed >= enemyInterruptAt) {
-    interruptCasting(now, elapsed);
+    BInterruptCasting(now, elapsed);
   }
 }
 
-function updatePause(now) {
+function SystemUpdatePause(now) {
   const elapsed = now - startTime;
   // console.log("暂停状态，已过时长:", elapsed, startTime, now);
   if (enemyInterruptAt !== null && elapsed >= enemyInterruptAt) {
-    playSkillOnce();
-    enemyCdEndTime = now + BLADEFLY_CD; // 你也可以单独设 ENEMY_CD
-    enemyInterruptAt = null;
+    BStartPause(now);
   }
   // 暂停状态下不推进读条
   barFraction = 0.0;
 }
 
-function updateResult(now, enemyOnCd) {
+function SystemUpdateResult(now, enemyOnCd) {
   if (enemyOnCd) {
     const remain = (enemyCdEndTime - now).toFixed(1);
     // message = `被飞了吧？重新试着骗吧~ `;
@@ -466,8 +390,56 @@ function updateResult(now, enemyOnCd) {
   state = "READY";
 }
 
+async function handleAction() {
+  const now = performance.now() / 1000;
+
+  // 移动端音频解锁（如果你还在用 audio.js 模块版就调用 unlockAudio();）
+  // await unlockAudio();
+
+  const enemyOnCd = (enemyCdEndTime !== null && now < enemyCdEndTime);
+//   console.log("当前状态", state, "敌方CD吗", enemyOnCd);
+
+  // RESULT / READY：开始读条
+  if (state === "READY" || state === "RESULT") {
+    if (enemyOnCd) {  
+        return;
+        }
+    // 如果敌方不在CD：生成“断点反应时间+打断时刻”
+    if (!enemyOnCd) {
+      BPlanInterruptOnStart();
+    } else {
+      enemyBreakFrac = null;
+      enemyReactSec = null;
+      enemyInterruptAt = null;
+      // message = "敌方在CD！稳稳读完就赢啦~;"
+    }
+    
+    // 播放读条音效（可选）
+    AStartCasting(now);
+    return;
+  }
+  else if (state === "PAUSE") {
+    BPlanInterruptOnResume();
+
+    // 播放读条音效（可选）
+    AStartCasting(now);
+    return;  
+    }
+  // CASTING：点击取消读条（骗断）
+
+  else if (state === "CASTING") {
+    // 取消读条：进度归零（也可以保留显示，但更像“停手”就归零）
+    ACancelCasting();
+    return;
+  }
+}
+//#endregion  
+//#endregion
+
+
+
 // #region ========== 6) 逻辑更新（update：推进状态机/读条/自断/超时/淡出）==========
-function update() {
+function SystemUpdate() {
   const now = performance.now() / 1000;
 
   if (enemyCdEndTime !== null && now >= enemyCdEndTime) {
@@ -478,13 +450,13 @@ function update() {
   
   // CASTING：推进读条
   if (state === "CASTING" ) {
-    updateCasting(now, enemyOnCd);
+    SystemUpdateCasting(now, enemyOnCd);
   } else if (state === "PAUSE"){
-    updatePause(now);
+    SystemUpdatePause(now);
   }
   // READY：提示敌方CD剩余（可选）
   else if (state === "RESULT") {
-    updateResult(now, enemyOnCd);
+    SystemUpdateResult(now, enemyOnCd);
   }
 
   // 红色条淡出（保留你原逻辑）
@@ -711,7 +683,7 @@ function draw() {
 
 // #region ========== 8) 主循环（gameLoop）==========
 function gameLoop() {
-  update();
+  SystemUpdate();
   draw();
   requestAnimationFrame(gameLoop);
 }
