@@ -105,6 +105,7 @@ const JOBS = {
 
 let currentJobKey = 'Blade';
 let currentJob = JOBS[currentJobKey];
+let skillIconInitialized = false;
 
 function getCdSeconds() {
   return (currentJob && typeof currentJob.cd === 'number') ? currentJob.cd : 3.0;
@@ -115,7 +116,18 @@ function setJob(jobKey) {
   currentJobKey = jobKey;
   currentJob = JOBS[jobKey];
   setSkillIcon(currentJob.icon);
+  skillIconInitialized = Boolean(Assets.skillImg && Assets.skillImg.src);
   message = `长按读条欺骗${currentJob.name}，骗到别忘了生太极！`;
+}
+
+function ensureSkillIcon() {
+  if (Assets.skillImg && Assets.skillImg.src) {
+    skillIconInitialized = true;
+  }
+  if (skillIconInitialized) return;
+  const icon = currentJob && currentJob.icon ? currentJob.icon : 'img/icon_blade.png';
+  setSkillIcon(icon);
+  skillIconInitialized = Boolean(Assets.skillImg && Assets.skillImg.src);
 }
 // #endregion
 
@@ -124,6 +136,8 @@ function setJob(jobKey) {
 // #region ========== 2) 资源初始化（图片/音效预加载） ==========
 initImages();
 setSkillIcon(currentJob.icon);
+skillIconInitialized = Boolean(Assets.skillImg && Assets.skillImg.src);
+setTimeout(ensureSkillIcon, 0);
 preloadAllSounds();
 // #endregion
 
@@ -156,6 +170,7 @@ let message = '2P mode';
 // Time
 let startTime = null;
 let prepareStartTime = null;
+let aCancelUntil = null;
 
 // Casting
 const CAST_DURATION = 0.63;
@@ -169,6 +184,11 @@ let bReady = false;
 let aComMode = false;
 let bComMode = false;
 
+// Audio sources
+let currentBarSource = null;
+let currentSkillSource = null;
+let currentFinishSource = null;
+
 // B cooldown
 const B_CD_SECONDS = 3.0;
 let bCdEndTime = null;
@@ -176,7 +196,8 @@ let bCdEndTime = null;
 // ====== Strategy ======
 const AStrategy = {
   startChance: 0.5,
-  cancelAtFrac: 0.4
+  cancelAtFrac: 0.4,
+  cancelCooldown: 0.6
 };
 
 const BStrategy = {
@@ -184,9 +205,20 @@ const BStrategy = {
   reactionTime: 0.2
 };
 
-// ====== Assets / init ======
-initImages();
-preloadAllSounds();
+function randomBetween(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+function AUpdateStrategyRandom() {
+  AStrategy.startChance = randomBetween(0.2, 0.8);
+  AStrategy.cancelAtFrac = randomBetween(0.1, 1.3);
+  AStrategy.cancelCooldown = randomBetween(0.2, 1.2);
+}
+
+function BUpdateStrategyRandom() {
+  BStrategy.reactionAtFrac = randomBetween(0.2, 0.9);
+  BStrategy.reactionTime = randomBetween(0.05, 0.45);
+}
 
 // ====== A system ======
 function AReady() {
@@ -195,6 +227,7 @@ function AReady() {
 
 function ASetComMode(enabled) {
   aComMode = Boolean(enabled);
+  if (aComMode) AReady();
 }
 
 function AStartCasting(now) {
@@ -202,12 +235,33 @@ function AStartCasting(now) {
   aState = AState.CASTING;
   startTime = now;
   barFraction = 0.0;
+
+  stopSound(currentBarSource);
+  currentBarSource = playSound('bar', false);
 }
 
 function ACancelCasting(now) {
   if (systemState !== SystemState.RUNNING) return;
   aState = AState.NO_CASTING;
   barFraction = 0.0;
+  aCancelUntil = now + AStrategy.cancelCooldown;
+  stopAllSounds();
+  AUpdateStrategyRandom();
+}
+
+function resetBarVisuals() {
+  barRgb = BAR_COLOR_NORMAL;
+  barAlpha = 1.0;
+  barFadeActive = false;
+  barHitFraction = 0.0;
+}
+
+function showInterruptBar(now) {
+  barHitFraction = Math.max(0, Math.min(1, barFraction));
+  barRgb = BAR_COLOR_HIT;
+  barAlpha = 1.0;
+  barFadeActive = true;
+  barFadeStartTime = now;
 }
 
 // ====== B system ======
@@ -217,6 +271,7 @@ function BReady() {
 
 function BSetComMode(enabled) {
   bComMode = Boolean(enabled);
+  if (bComMode) BReady();
 }
 
 function BInterrupt(now) {
@@ -227,9 +282,15 @@ function BInterrupt(now) {
     aReady = false;
     bReady = false;
     aState = AState.NO_CASTING;
+    showInterruptBar(now);
   }
   bState = BState.IN_CD;
   bCdEndTime = now + B_CD_SECONDS;
+
+  stopSound(currentBarSource);
+  currentBarSource = null;
+  stopSound(currentSkillSource);
+  currentSkillSource = playSound('skill_blade', false);
 }
 
 // ====== System ======
@@ -250,7 +311,10 @@ function updatePrepare(now) {
     bState = BState.NO_CD;
     startTime = null;
     barFraction = 0.0;
+    resetBarVisuals();
   }
+  AUpdateStrategyRandom();
+  BUpdateStrategyRandom();
 }
 
 function updateCasting(now) {
@@ -263,6 +327,11 @@ function updateCasting(now) {
     aReady = false;
     bReady = false;
     aState = AState.NO_CASTING;
+
+    stopSound(currentBarSource);
+    currentBarSource = null;
+    stopSound(currentFinishSource);
+    currentFinishSource = playSound('finish', false);
   }
 }
 
@@ -283,6 +352,7 @@ function UpdateAStrategy(now) {
   if (systemState !== SystemState.RUNNING) return;
 
   if (aState === AState.NO_CASTING) {
+    if (aCancelUntil !== null && now < aCancelUntil) return;
     if (Math.random() < AStrategy.startChance) {
       AStartCasting(now);
     }
@@ -313,6 +383,11 @@ function UpdateBStrategy(now) {
 function SystemUpdate() {
   const now = performance.now() / 1000;
 
+  if (systemState === SystemState.AWIN || systemState === SystemState.BWIN) {
+    if (aComMode) AReady();
+    if (bComMode) BReady();
+  }
+
   maybeEnterPrepare(now);
 
   if (systemState === SystemState.PREPARE) {
@@ -328,11 +403,58 @@ function SystemUpdate() {
   }
 }
 
+function stopAllSounds() {
+  stopSound(currentBarSource);
+  stopSound(currentSkillSource);
+  stopSound(currentFinishSource);
+  currentBarSource = null;
+  currentSkillSource = null;
+  currentFinishSource = null;
+}
+
 // ====== Input (placeholder) ======
 // Hook your input/UI to call AReady/BReady/AStartCasting/ACancelCasting/BInterrupt.
+let aComToggleEl = null;
+let bComToggleEl = null;
+
+function syncComToggles() {
+  if (aComToggleEl) aComToggleEl.checked = aComMode;
+  if (bComToggleEl) bComToggleEl.checked = bComMode;
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  aComToggleEl = document.getElementById('aComToggle');
+  bComToggleEl = document.getElementById('bComToggle');
+
+  if (aComToggleEl) {
+    aComToggleEl.addEventListener('change', () => {
+      ASetComMode(aComToggleEl.checked);
+      syncComToggles();
+    });
+  }
+
+  if (bComToggleEl) {
+    bComToggleEl.addEventListener('change', () => {
+      BSetComMode(bComToggleEl.checked);
+      syncComToggles();
+    });
+  }
+
+  syncComToggles();
+});
+
 window.addEventListener('keydown', (e) => {
   if (e.repeat) return;
   const now = performance.now() / 1000;
+
+  if (e.key === '1') {
+    ASetComMode(!aComMode);
+    syncComToggles();
+  }
+  if (e.key === '2') {
+    BSetComMode(!bComMode);
+    syncComToggles();
+  }
 
   if (!aComMode) {
     if (e.key === 'a') AReady();
@@ -448,15 +570,17 @@ function drawLogo() {
 }
 
 function drawSkillIcon() {
-  if (Assets.skillLoaded && Assets.skillImg) {
-    ctx.drawImage(Assets.skillImg, iconX, iconY, iconSize, iconSize);
-  } else {
-    ctx.fillStyle = UI.iconFallback;
-    ctx.fillRect(iconX, iconY, iconSize, iconSize);
-    ctx.strokeStyle = UI.iconStroke;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(iconX, iconY, iconSize, iconSize);
+  ensureSkillIcon();
+  const img = Assets.skillImg;
+  if (img && img.complete && img.naturalWidth > 0) {
+    ctx.drawImage(img, iconX, iconY, iconSize, iconSize);
+    return;
   }
+  ctx.fillStyle = UI.iconFallback;
+  ctx.fillRect(iconX, iconY, iconSize, iconSize);
+  ctx.strokeStyle = UI.iconStroke;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(iconX, iconY, iconSize, iconSize);
 }
 
 function drawCooldownOverlay(target, remaining, total) {
@@ -510,6 +634,12 @@ function drawTexts() {
   ctx.font = resultFont;
   ctx.fillStyle = UI.textResult;
   ctx.fillText(text, WIDTH / 2, HEIGHT * 0.85);
+
+  // Debug line (disabled)
+  // ctx.font = '12px "Microsoft YaHei", Arial';
+  // ctx.fillStyle = '#88a';
+  // const src = Assets.skillImg ? Assets.skillImg.src : '(no image)';
+  // ctx.fillText(`icon: ${currentJob?.icon || 'none'} | src: ${src || 'empty'}`, WIDTH / 2, HEIGHT * 0.9);
 }
 
 function draw() {

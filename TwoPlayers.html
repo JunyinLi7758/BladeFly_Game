@@ -8,8 +8,22 @@
 </head>
 <body>
     <div class="container">
-        <div class="job-select">
-            <button class="job-btn" onclick="location.href='index.html'">返回模式选择</button>
+                <!-- 新增：职业选择 -->
+        <div class="job-select"> 
+             <button class="job-btn" onclick="location.href='index.html'">
+                ← 模式选择
+            </button>
+            <button class="job-btn" data-job="Blade">剑纯</button>
+            <button class="job-btn" data-job="Flower">万花</button>
+            <button class="job-btn" data-job="Toxic">五毒</button>
+            <label class="job-btn" style="display:flex;align-items:center;gap:6px;">
+                <input id="aComToggle" type="checkbox" />
+                A COM
+            </label>
+            <label class="job-btn" style="display:flex;align-items:center;gap:6px;">
+                <input id="bComToggle" type="checkbox" />
+                B COM
+            </label>
         </div>
 
         <canvas id="gameCanvas"></canvas>

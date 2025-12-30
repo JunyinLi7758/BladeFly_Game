@@ -18,7 +18,7 @@ export function initImages() {
   Assets.skillImg = new Image();
   Assets.skillImg.onload = () => {
     Assets.skillLoaded = true;
-    // console.log('图标加载成功');
+    console.log('图标加载成功');
   };
   Assets.skillImg.onerror = () => {
     console.warn('图标加载失败，请检查路径');
@@ -29,4 +29,5 @@ export function setSkillIcon(url) {
   if (!Assets.skillImg) return;
   Assets.skillLoaded = false;
   Assets.skillImg.src = url;
+
 }
