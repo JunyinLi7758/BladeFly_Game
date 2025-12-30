@@ -201,6 +201,7 @@ let currentFinishSource = null;
 // B cooldown
 const B_CD_SECONDS = 3.0;
 let bCdEndTime = null;
+let bCdRemaining = 0;
 
 // ====== Strategy ======
 const AStrategy = {
@@ -477,7 +478,9 @@ function connectWS() {
       aReady = msg.aReady;
       bReady = msg.bReady;
       barFraction = msg.barFraction;
-      bCdEndTime = msg.bCdEndTime;
+        // Prefer server-provided remaining seconds to avoid clock skew on mobile
+        bCdRemaining = typeof msg.bCdRemaining === 'number' ? msg.bCdRemaining : 0;
+        bCdEndTime = msg.bCdEndTime;
 
       if (prevState !== systemState) {
         if (systemState === SystemState.RUNNING) {
@@ -766,9 +769,13 @@ function drawCooldownOverlay(target, remaining, total) {
 function drawCooldownOverlays(now) {
   const iconTarget = { x: iconX, y: iconY, size: iconSize };
 
+  // Use epoch time when connected (server sends epoch seconds), otherwise use performance time
   let cdRemaining = 0.0;
-  if (bCdEndTime !== null) {
-    cdRemaining = bCdEndTime - now;
+  if (wsConnected) {
+    cdRemaining = typeof bCdRemaining === 'number' ? bCdRemaining : 0.0;
+  } else {
+    const nowSec = now;
+    if (bCdEndTime !== null) cdRemaining = bCdEndTime - nowSec;
   }
   drawCooldownOverlay(iconTarget, cdRemaining, B_CD_SECONDS);
 }
@@ -820,6 +827,10 @@ function drawTexts() {
   ctx.fillStyle = '#8aa';
   const wsState = wsConnected ? `ON${wsRole ? `(${wsRole})` : ''}` : 'OFF';
   ctx.fillText(`WS: ${wsState}`, WIDTH / 2, HEIGHT * 0.93);
+  // debug: show CD values
+  ctx.font = '11px "Microsoft YaHei", Arial';
+  ctx.fillStyle = '#c9c';
+  ctx.fillText(`bCdRemaining: ${bCdRemaining.toFixed(2)}  bCdEndTime: ${bCdEndTime === null ? 'null' : bCdEndTime.toFixed(2)}`, WIDTH / 2, HEIGHT * 0.96);
 }
 
 function draw() {

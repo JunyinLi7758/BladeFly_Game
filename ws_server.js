@@ -145,6 +145,7 @@ function handleInput(room, role, action) {
     }
     room.bState = BState.IN_CD;
     room.bCdEndTime = now + B_CD_SECONDS;
+    console.log(`B interrupt used, next available at ${room.bCdEndTime.toFixed(2)}`);
   }
 }
 
@@ -189,7 +190,8 @@ setInterval(() => {
       aReady: room.aReady,
       bReady: room.bReady,
       barFraction: room.barFraction,
-      bCdEndTime: room.bCdEndTime
+      bCdEndTime: room.bCdEndTime,
+      bCdRemaining: room.bCdEndTime !== null ? Math.max(0, room.bCdEndTime - nowSec()) : 0
     });
   }
 }, TICK_MS);
