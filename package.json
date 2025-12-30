@@ -1,0 +1,24 @@
+{
+  "name": "bladefly_game",
+  "version": "1.0.0",
+  "description": "虽然A了剑三，不过还是尝试自己写个小游戏玩玩。",
+  "main": "assets.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JunyinLi7758/BladeFly_Game.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/JunyinLi7758/BladeFly_Game/issues"
+  },
+  "homepage": "https://github.com/JunyinLi7758/BladeFly_Game#readme",
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}
