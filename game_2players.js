@@ -483,6 +483,14 @@ function connectWS() {
 
     if (msg.type === 'joined') {
       wsRole = msg.role || null;
+      systemState = SystemState.IDLE;
+      aState = AState.NO_CASTING;
+      bState = BState.NO_CD;
+      aReady = false;
+      bReady = false;
+      barFraction = 0.0;
+      resetBarVisuals();
+      message = '等待进入房间...';
       return;
     }
 
@@ -519,6 +527,11 @@ function connectWS() {
       if (prevState !== systemState) {
         if (systemState === SystemState.RUNNING) {
           resetBarVisuals();
+        }
+        if (systemState === SystemState.IDLE) {
+          barFraction = 0.0;
+          resetBarVisuals();
+          message = '等待进入房间...';
         }
         if (systemState === SystemState.AWIN) {
           stopSound(currentBarSource);

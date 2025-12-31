@@ -66,6 +66,18 @@ function assignRole(room) {
   return 'S';
 }
 
+function resetRoomState(room) {
+  room.systemState = SystemState.IDLE;
+  room.aState = AState.NO_CASTING;
+  room.bState = BState.NO_CD;
+  room.aReady = false;
+  room.bReady = false;
+  room.startTime = null;
+  room.prepareStartTime = null;
+  room.barFraction = 0.0;
+  room.bCdEndTime = null;
+}
+
 function broadcast(room, payload) {
   const msg = JSON.stringify(payload);
   for (const ws of room.clients.keys()) {
@@ -161,9 +173,13 @@ wss.on('connection', (ws) => {
     try { msg = JSON.parse(data.toString()); } catch (e) { return; }
 
     if (msg.type === 'join') {
+      if (room) {
+        room.clients.delete(ws);
+      }
       room = getRoom(msg.roomId || 'default');
       role = msg.role || assignRole(room);
       room.clients.set(ws, { role });
+      resetRoomState(room);
       ws.send(JSON.stringify({ type: 'joined', role, roomId: room.roomId }));
       return;
     }
