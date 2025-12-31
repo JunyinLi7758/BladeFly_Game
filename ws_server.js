@@ -200,7 +200,7 @@ setInterval(() => {
       bReady: room.bReady,
       barFraction: room.barFraction,
       bCdEndTime: room.bCdEndTime,
-      bCdRemaining: room.bCdEndTime !== null ? 2 : Math.max(1, room.bCdEndTime - nowSec()) 
+      bCdRemaining: room.bCdEndTime !== null ? Math.max(0, room.bCdEndTime - nowSec()) : 0
     });
   }
 }, TICK_MS);

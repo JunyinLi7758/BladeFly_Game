@@ -305,7 +305,12 @@ function BSetComMode(enabled) {
 
 function BInterrupt(now) {
   if (bCdEndTime !== null && now < bCdEndTime) return;
+  if (systemState === SystemState.IDLE || systemState === SystemState.AWIN || systemState === SystemState.BWIN || systemState === SystemState.PREPARE) {
+    return;
+  }
   if (wsConnected) {
+    stopSound(currentSkillSource);
+    currentSkillSource = playSound('skill_blade', false);
     sendInput('interrupt');
     return;
   }
@@ -483,6 +488,7 @@ function connectWS() {
 
     if (msg.type === 'state') {
       const prevState = systemState;
+      const prevAState = aState;
       systemState = msg.systemState;
       aState = msg.aState;
       bState = msg.bState;
@@ -505,11 +511,28 @@ function connectWS() {
         }
         bCdEndTime = msg.bCdEndTime;
 
+      if (prevAState !== aState && aState === AState.CASTING) {
+        stopSound(currentBarSource);
+        currentBarSource = playSound('bar', false);
+      }
+
       if (prevState !== systemState) {
         if (systemState === SystemState.RUNNING) {
           resetBarVisuals();
         }
+        if (systemState === SystemState.AWIN) {
+          stopSound(currentBarSource);
+          currentBarSource = null;
+          stopSound(currentFinishSource);
+          currentFinishSource = playSound('finish', false);
+        }
         if (systemState === SystemState.BWIN && prevState === SystemState.RUNNING) {
+          stopSound(currentBarSource);
+          currentBarSource = null;
+          if (wsRole !== 'B') {
+            stopSound(currentSkillSource);
+            currentSkillSource = playSound('skill_blade', false);
+          }
           showInterruptBar(performance.now() / 1000);
         }
       }
@@ -805,13 +828,19 @@ function drawCooldownOverlay(target, remaining, total) {
   drawCDFan(target.x, target.y, target.size, fraction);
 }
 
+function getBcdRemaining(nowSec) {
+  if (bCdEndTime === null) return 0.0;
+  const adjustedNow = nowSec + clockOffset;
+  return Math.max(0, Math.min(B_CD_SECONDS, bCdEndTime - adjustedNow));
+}
+
 function drawCooldownOverlays(now) {
   const iconTarget = { x: iconX, y: iconY, size: iconSize };
 
   // Use epoch time when connected (server sends epoch seconds), otherwise use performance time
   let cdRemaining = 0.0;
   if (wsConnected) {
-    cdRemaining = typeof bCdRemaining === 'number' ? bCdRemaining : 0.0;
+    cdRemaining = getBcdRemaining(Date.now() / 1000);
   } else {
     const nowSec = now;
     if (bCdEndTime !== null) cdRemaining = bCdEndTime - nowSec;
