@@ -9,6 +9,7 @@ const PREPARE_SECONDS = 3.0;
 const CAST_DURATION = 0.63;
 const B_CD_SECONDS = 3.0;
 
+// 系统状态
 const SystemState = {
   IDLE: 'IDLE',
   PREPARE: 'PREPARE',
@@ -17,20 +18,24 @@ const SystemState = {
   BWIN: 'BWIN'
 };
 
+// A玩家状态
 const AState = {
   NO_CASTING: 'NO_CASTING',
   CASTING: 'CASTING'
 };
 
+// B玩家状态
 const BState = {
   NO_CD: 'NO_CD',
   IN_CD: 'IN_CD'
 };
 
+// 获取当前时间（秒）
 function nowSec() {
   return Date.now() / 1000;
 }
 
+// 创建新房间
 function createRoom(roomId) {
   return {
     roomId,
@@ -49,11 +54,13 @@ function createRoom(roomId) {
 
 const rooms = new Map();
 
+// 获取或创建房间
 function getRoom(roomId) {
   if (!rooms.has(roomId)) rooms.set(roomId, createRoom(roomId));
   return rooms.get(roomId);
 }
 
+// 分配房间内角色A、B或S
 function assignRole(room) {
   let hasA = false;
   let hasB = false;
@@ -66,6 +73,7 @@ function assignRole(room) {
   return 'S';
 }
 
+// 重置房间状态
 function resetRoomState(room) {
   room.systemState = SystemState.IDLE;
   room.aState = AState.NO_CASTING;
@@ -78,6 +86,7 @@ function resetRoomState(room) {
   room.bCdEndTime = null;
 }
 
+// 向房间内所有客户端广播状态
 function broadcast(room, payload) {
   const msg = JSON.stringify(payload);
   for (const ws of room.clients.keys()) {
@@ -85,14 +94,17 @@ function broadcast(room, payload) {
   }
 }
 
+// 更新房间状态机
 function updateRoom(room) {
   const now = nowSec();
 
+  // 检测B的冷却时间是否结束
   if (room.bCdEndTime !== null && now >= room.bCdEndTime) {
     room.bCdEndTime = null;
     room.bState = BState.NO_CD;
   }
 
+  // 初始/结束状态 ==> 准备状态
   if ((room.systemState === SystemState.IDLE ||
        room.systemState === SystemState.AWIN ||
        room.systemState === SystemState.BWIN) &&
@@ -101,6 +113,7 @@ function updateRoom(room) {
     room.prepareStartTime = now;
   }
 
+  // 准备状态 ==> 运行状态
   if (room.systemState === SystemState.PREPARE &&
       room.prepareStartTime !== null &&
       now - room.prepareStartTime >= PREPARE_SECONDS) {
@@ -111,6 +124,7 @@ function updateRoom(room) {
     room.barFraction = 0.0;
   }
 
+  // 运行状态下A的施法进度更新
   if (room.systemState === SystemState.RUNNING && room.aState === AState.CASTING) {
     const elapsed = now - room.startTime;
     room.barFraction = elapsed / CAST_DURATION;
@@ -124,14 +138,17 @@ function updateRoom(room) {
   }
 }
 
+// 处理客户端输入
 function handleInput(room, role, action) {
   const now = nowSec();
+  // A、B玩家准备就绪
   if (action === 'ready') {
     if (role === 'A') room.aReady = true;
     if (role === 'B') room.bReady = true;
     return;
   }
 
+  // A玩家开始读条
   if (action === 'start_cast' && role === 'A') {
     if (room.systemState !== SystemState.RUNNING) return;
     room.aState = AState.CASTING;
@@ -140,6 +157,7 @@ function handleInput(room, role, action) {
     return;
   }
 
+  // A玩家取消读条
   if (action === 'cancel_cast' && role === 'A') {
     if (room.systemState !== SystemState.RUNNING) return;
     room.aState = AState.NO_CASTING;
@@ -147,6 +165,7 @@ function handleInput(room, role, action) {
     return;
   }
 
+  // B玩家使用打断
   if (action === 'interrupt' && role === 'B') {
     if (room.bCdEndTime !== null && now < room.bCdEndTime) return;
     if (room.systemState === SystemState.RUNNING && room.aState === AState.CASTING) {
@@ -163,6 +182,7 @@ function handleInput(room, role, action) {
 
 const server = http.createServer();
 const wss = new WebSocket.Server({ server });
+
 
 wss.on('connection', (ws) => {
   let room = null;
