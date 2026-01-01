@@ -96,7 +96,7 @@ window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 100)
 
 
 
-// #region ========== 1) 职业系统（JOBS / currentJob / setJob / getCdSeconds）==========
+// #region ========== 1) 职业选择系统（JOBS / currentJob / setJob / getCdSeconds）==========
 const JOBS = {
   Blade:  { name: '剑纯', skillname: '剑飞惊天', icon: 'img/icon_blade.png',  skillSound: 'skill_blade',  cd: 3.0 },
   Flower: { name: '万花', skillname: '厥阴',   icon: 'img/icon_flower.png', skillSound: 'skill_flower', cd: 3.0 },
@@ -143,7 +143,7 @@ preloadAllSounds();
 
 
 
-// ====== System State ======
+// #region ========= 3) 游戏状态机 与 初始变量 ======
 const SystemState = {
   IDLE: 'IDLE',
   PREPARE: 'PREPARE',
@@ -206,6 +206,10 @@ let bCdRemaining = 0;
 let clockOffset = 0; // server_time - local_time (seconds)
 let pingIntervalId = null;
 
+
+//#endregion
+
+//#region  ======== 4) AI 策略系统 ======
 // ====== Strategy ======
 const AStrategy = {
   startChance: 0.5,
@@ -232,7 +236,9 @@ function BUpdateStrategyRandom() {
   BStrategy.reactionAtFrac = randomBetween(0.2, 0.9);
   BStrategy.reactionTime = randomBetween(0.05, 0.45);
 }
+//#endregion
 
+// #region   ===== 5) 玩家AB 操作函数 ======
 // ====== A system ======
 function AReady() {
   if (wsConnected) {
@@ -330,7 +336,9 @@ function BInterrupt(now) {
   stopSound(currentSkillSource);
   currentSkillSource = playSound('skill_blade', false);
 }
+//#endregion
 
+//#region ===== 6) 房间状态更新与处理函数 ======
 // ====== System ======
 function maybeEnterPrepare(now) {
   if ((systemState === SystemState.IDLE || systemState === SystemState.AWIN || systemState === SystemState.BWIN
@@ -450,7 +458,9 @@ function stopAllSounds() {
   currentSkillSource = null;
   currentFinishSource = null;
 }
+//#endregion
 
+//#region ===== 7) WS 通讯部分 ======
 function sendInput(action) {
   if (!wsConnected || !ws) return;
   ws.send(JSON.stringify({ type: 'input', action }));
@@ -573,8 +583,9 @@ function connectWS() {
     if (pingIntervalId) { clearInterval(pingIntervalId); pingIntervalId = null; }
   });
 }
+//#endregion
 
-// ====== Input: 按键与画布长按/短按逻辑 ======
+//#region ===== 8) Input: 按键与画布长按/短按逻辑 ======
 let recentLongPress = 0; // seconds, used to avoid double-triggering click after long-press
 
 // Canvas press handling: 长按触发 A start_cast，松开触发 cancel；短按作为打断（B）或准备（A）
@@ -722,9 +733,9 @@ function tryGlobalReady(e, isTouch = false) {
 
 window.addEventListener('click', (e) => tryGlobalReady(e, false));
 window.addEventListener('touchend', (e) => tryGlobalReady(e, true), { passive: false });
+//#endregion
 
-
-// #region ========== 7) 绘制系统（draw + 绘制工具函数）=========
+// #region ========== 9) 绘制系统（draw + 绘制工具函数）=========
 function drawRoundedRect(x, y, w, h, radius) {
   ctx.beginPath();
   ctx.moveTo(x + radius, y);

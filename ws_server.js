@@ -180,22 +180,26 @@ function handleInput(room, role, action) {
   }
 }
 
+
 const server = http.createServer();
 const wss = new WebSocket.Server({ server });
 
-
+//    
 wss.on('connection', (ws) => {
   let room = null;
   let role = null;
 
+  // 处理客户端消息
   ws.on('message', (data) => {
     let msg = null;
     try { msg = JSON.parse(data.toString()); } catch (e) { return; }
 
+    //  加入房间消息: {type:'join', roomId?, role?}
     if (msg.type === 'join') {
       if (room) {
         room.clients.delete(ws);
       }
+      // 获取或创建房间，分配角色
       room = getRoom(msg.roomId || 'default');
       role = msg.role || assignRole(room);
       room.clients.set(ws, { role });
@@ -204,7 +208,7 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    // simple ping/pong for clock sync: client sends {type:'ping', clientSent}
+    // 测试ping时间延迟: {type:'ping', clientSent}
     if (msg.type === 'ping') {
       const serverNow = nowSec();
       try {
@@ -213,17 +217,24 @@ wss.on('connection', (ws) => {
       return;
     }
 
+    //  处理输入消息: {type:'input', action}
     if (!room || !role) return;
+
+    // 处理输入动作
     if (msg.type === 'input') {
       handleInput(room, role, msg.action);
     }
   });
 
+  // 处理连接关闭
   ws.on('close', () => {
     if (room) room.clients.delete(ws);
   });
 });
 
+
+// 定时更新房间状态并广播
+// 广播信息： {type:'state', systemState, aState, bState, aReady, bReady, barFraction, bCdEndTime, bCdRemaining}
 setInterval(() => {
   for (const room of rooms.values()) {
     updateRoom(room);
