@@ -2,7 +2,7 @@
 import { Assets, initImages, setSkillIcon } from './assets.js';
 import { preloadAllSounds, unlockAudio, playSound, stopSound } from './audio.js';
 
-// #region ========== 0) 基本常量与画布（canvas / resize / layout缓存）==========
+// #region  0) 基本常量与画布（canvas / resize / layout缓存）==========
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -96,7 +96,7 @@ window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 100)
 
 
 
-// #region ========== 1) 职业选择系统（JOBS / currentJob / setJob / getCdSeconds）==========
+// #region  1) 职业选择系统（JOBS / currentJob / setJob / getCdSeconds）==========
 const JOBS = {
   Blade:  { name: '剑纯', skillname: '剑飞惊天', icon: 'img/icon_blade.png',  skillSound: 'skill_blade',  cd: 3.0 },
   Flower: { name: '万花', skillname: '厥阴',   icon: 'img/icon_flower.png', skillSound: 'skill_flower', cd: 3.0 },
@@ -133,7 +133,7 @@ function ensureSkillIcon() {
 
 
 
-// #region ========== 2) 资源初始化（图片/音效预加载） ==========
+// #region  2) 资源初始化（图片/音效预加载） ==========
 initImages();
 setSkillIcon(currentJob.icon);
 skillIconInitialized = Boolean(Assets.skillImg && Assets.skillImg.src);
@@ -143,7 +143,7 @@ preloadAllSounds();
 
 
 
-// #region ========= 3) 游戏状态机 与 初始变量 ======
+// #region  3) 游戏状态机 与 初始变量 ======
 const SystemState = {
   IDLE: 'IDLE',
   PREPARE: 'PREPARE',
@@ -175,6 +175,10 @@ let wsConnected = false;
 let wsRole = null;
 let roomInputEl = null;
 let btnJoinRoomEl = null;
+let preJoinEl = null;
+let inRoomEl = null;
+let roomIdLabelEl = null;
+let roleValueEl = null;
 
 // Time
 let startTime = null;
@@ -209,7 +213,7 @@ let pingIntervalId = null;
 
 //#endregion
 
-//#region  ======== 4) AI 策略系统 ======
+//#region  4) AI 策略系统 ======
 // ====== Strategy ======
 const AStrategy = {
   startChance: 0.5,
@@ -238,7 +242,7 @@ function BUpdateStrategyRandom() {
 }
 //#endregion
 
-// #region   ===== 5) 玩家AB 操作函数 ======
+// #region  5) 玩家AB 操作函数 ======
 // ====== A system ======
 function AReady() {
   if (wsConnected) {
@@ -338,7 +342,7 @@ function BInterrupt(now) {
 }
 //#endregion
 
-//#region ===== 6) 房间状态更新与处理函数 ======
+//#region  6) 房间状态更新与处理函数 ======
 // ====== System ======
 function maybeEnterPrepare(now) {
   if ((systemState === SystemState.IDLE || systemState === SystemState.AWIN || systemState === SystemState.BWIN
@@ -460,7 +464,7 @@ function stopAllSounds() {
 }
 //#endregion
 
-//#region ===== 7) WS 通讯部分 ======
+//#region  7) WS 通讯部分 ======
 function sendInput(action) {
   if (!wsConnected || !ws) return;
   ws.send(JSON.stringify({ type: 'input', action }));
@@ -500,7 +504,14 @@ function connectWS() {
       bReady = false;
       barFraction = 0.0;
       resetBarVisuals();
-      message = '等待进入房间...';
+      updateRoomPanels();
+      if (wsRole === 'A') {
+        message = '你是气纯：长按读条，松开取消。';
+      } else if (wsRole === 'B') {
+        message = '你是剑纯：短按打断，注意冷却。';
+      } else {
+        message = '旁观中：等待下一局。';
+      }
       return;
     }
 
@@ -538,10 +549,19 @@ function connectWS() {
         if (systemState === SystemState.RUNNING) {
           resetBarVisuals();
         }
+        if (systemState === SystemState.PREPARE) {
+          prepareStartTime = performance.now() / 1000;
+        }
         if (systemState === SystemState.IDLE) {
           barFraction = 0.0;
           resetBarVisuals();
-          message = '等待进入房间...';
+          if (wsRole === 'A') {
+            message = '你是气纯：点击/触屏准备，长按读条。';
+          } else if (wsRole === 'B') {
+            message = '你是剑纯：点击/触屏准备，短按打断。';
+          } else {
+            message = '旁观中：等待下一局。';
+          }
         }
         if (systemState === SystemState.AWIN) {
           stopSound(currentBarSource);
@@ -581,11 +601,12 @@ function connectWS() {
     wsConnected = false;
     wsRole = null;
     if (pingIntervalId) { clearInterval(pingIntervalId); pingIntervalId = null; }
+    updateRoomPanels();
   });
 }
 //#endregion
 
-//#region ===== 8) Input: 按键与画布长按/短按逻辑 ======
+//#region  8) Input: 按键与画布长按/短按逻辑 ======
 let recentLongPress = 0; // seconds, used to avoid double-triggering click after long-press
 
 // Canvas press handling: 长按触发 A start_cast，松开触发 cancel；短按作为打断（B）或准备（A）
@@ -649,10 +670,39 @@ function setupCanvasInput() {
   canvas.addEventListener('touchcancel', endPress);
 }
 
+function updateRoomPanels() {
+  if (!preJoinEl || !inRoomEl) return;
+  if (wsConnected && wsRole) {
+    preJoinEl.style.display = 'none';
+    if (inRoomEl.style.display !== 'flex') {
+      inRoomEl.classList.remove('room-panel-enter');
+      // force reflow to restart animation
+      void inRoomEl.offsetWidth;
+      inRoomEl.classList.add('room-panel-enter');
+    }
+    inRoomEl.style.display = 'flex';
+    if (roomIdLabelEl) roomIdLabelEl.textContent = ROOM_ID || 'default';
+    if (roleValueEl) {
+      if (wsRole === 'A') roleValueEl.textContent = '气纯';
+      else if (wsRole === 'B') roleValueEl.textContent = '剑纯';
+      else roleValueEl.textContent = '旁观';
+    }
+    return;
+  }
+  preJoinEl.style.display = 'flex';
+  inRoomEl.style.display = 'none';
+  if (roomIdLabelEl) roomIdLabelEl.textContent = '-';
+  if (roleValueEl) roleValueEl.textContent = '-';
+}
+
 // 按钮与开关绑定
 window.addEventListener('DOMContentLoaded', () => {
   roomInputEl = document.getElementById('roomIdInput');
   btnJoinRoomEl = document.getElementById('btnJoinRoom');
+  preJoinEl = document.getElementById('preJoinRules');
+  inRoomEl = document.getElementById('inRoomBanner');
+  roomIdLabelEl = document.getElementById('roomIdLabel');
+  roleValueEl = document.getElementById('roleValue');
 
   // 初始化房间输入值
   if (roomInputEl) roomInputEl.value = ROOM_ID || 'default';
@@ -685,6 +735,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // no external control buttons — use canvas/touch/keyboard inputs
   setupCanvasInput();
+  updateRoomPanels();
 });
 
 // 键盘快捷键：单击准备 a/j，取消 d，打断 k
@@ -735,7 +786,7 @@ window.addEventListener('click', (e) => tryGlobalReady(e, false));
 window.addEventListener('touchend', (e) => tryGlobalReady(e, true), { passive: false });
 //#endregion
 
-// #region ========== 9) 绘制系统（draw + 绘制工具函数）=========
+//#region 9) 绘制系统（draw + 绘制工具函数）=========
 function drawRoundedRect(x, y, w, h, radius) {
   ctx.beginPath();
   ctx.moveTo(x + radius, y);
@@ -892,6 +943,17 @@ function drawTexts() {
   ctx.font = msgFont;
   ctx.fillStyle = UI.textSub;
   ctx.fillText(message, WIDTH / 2, HEIGHT * 0.36);
+  let subHint = '';
+  if (wsConnected && wsRole && systemState === SystemState.IDLE) {
+    if ((wsRole === 'A' && !bReady) || (wsRole === 'B' && !aReady)) {
+      subHint = '等待对方加入...';
+    }
+  }
+  if (subHint) {
+    ctx.font = '12px "Microsoft YaHei", Arial';
+    ctx.fillStyle = '#a7a7a7';
+    ctx.fillText(subHint, WIDTH / 2, HEIGHT * 0.41);
+  }
 
   let text;
   if (systemState === SystemState.AWIN) {
@@ -899,14 +961,29 @@ function drawTexts() {
   } else if (systemState === SystemState.BWIN) {
     text = '飞到咯！';
   } else if (systemState === SystemState.PREPARE) {
-    text = '准备中...';
+    let remaining = 3;
+    if (prepareStartTime !== null) {
+      remaining = Math.max(0, 3 - (performance.now() / 1000 - prepareStartTime));
+    }
+    text = `准备倒计时：${Math.ceil(remaining)}秒`;
   } else {    
     text = `游戏开始！`;
   }
 
-  ctx.font = resultFont;
-  ctx.fillStyle = UI.textResult;
-  ctx.fillText(text, WIDTH / 2, HEIGHT * 0.82);
+  if (systemState === SystemState.PREPARE) {
+    const bigSize = Math.max(resultSize * 1.6, 48);
+    ctx.font = `bold ${bigSize}px "Microsoft YaHei", Arial`;
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillStyle = '#ffd95a';
+    ctx.strokeText(text, WIDTH / 2, HEIGHT * 0.48);
+    ctx.fillText(text, WIDTH / 2, HEIGHT * 0.48);
+  } else {
+    ctx.font = resultFont;
+    ctx.fillStyle = UI.textResult;
+    ctx.fillText(text, WIDTH / 2, HEIGHT * 0.82);
+  }
 
   // A/B ready 状态显示
   ctx.font = '14px "Microsoft YaHei", Arial';

@@ -24,6 +24,18 @@
             <!-- COM toggles removed (use keyboard 1/2 to toggle if needed) -->
         </div>
 
+        <div id="preJoinRules" class="room-panel">
+            <div class="room-title">进入房间前请先读规则</div>
+            <div class="room-text">双人对战：一人读条（A），一人打断（B）。读条成功或打断成功即可获胜。</div>
+            <div class="room-text">操作：长按画布读条，松开取消；短按为打断；单击空白可准备开局。</div>
+        </div>
+
+        <div id="inRoomBanner" class="room-panel room-panel-live" style="display:none;">
+            <div class="room-title">已进入房间</div>
+            <div class="room-text"><span id="roomLabel">房间：</span> <span id="roomIdLabel">-</span></div>
+            <div class="room-text"><span id="roleLabel">角色：</span> <span id="roleValue">-</span></div>
+        </div>
+
         <canvas id="gameCanvas"></canvas>
 
         <!-- External control buttons removed; use screen/touch/keyboard instead -->

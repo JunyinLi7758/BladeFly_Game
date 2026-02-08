@@ -133,6 +133,69 @@ canvas {
   color: #fff;
 }
 
+/* ========== 房间规则与状态提示 ========== */
+.room-panel {
+  position: fixed;
+  top: 58px;
+  left: 10px;
+  right: 10px;
+  z-index: 18;
+  background: rgba(20, 20, 20, 0.85);
+  color: #e6e6e6;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+}
+
+.room-panel-live {
+  border-color: rgba(0, 180, 90, 0.4);
+  background: rgba(8, 24, 16, 0.9);
+  animation: livePulse 1.2s ease-in-out infinite;
+}
+
+.room-panel-enter {
+  animation: roomEnter 0.35s ease-out, livePulse 1.2s ease-in-out infinite;
+}
+
+.room-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: #9fe7b6;
+}
+
+.room-text {
+  font-size: 12px;
+  color: #cfcfcf;
+}
+
+@keyframes roomEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes livePulse {
+  0% {
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35), 0 0 0 rgba(0,180,90,0.0);
+  }
+  50% {
+    box-shadow: 0 8px 22px rgba(0,0,0,0.45), 0 0 18px rgba(0,180,90,0.35);
+  }
+  100% {
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35), 0 0 0 rgba(0,180,90,0.0);
+  }
+}
+
 /* ========== 排行榜列表与控件 ========== */
 .leaderboard-list {
   margin-top: 8px;
