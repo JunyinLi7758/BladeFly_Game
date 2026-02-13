@@ -1,4 +1,4 @@
-// game_2players.js
+﻿// game_2players.js
 import { Assets, initImages, setSkillIcon } from './assets.js';
 import { preloadAllSounds, unlockAudio, playSound, stopSound } from './audio.js';
 
@@ -786,7 +786,7 @@ window.addEventListener('click', (e) => tryGlobalReady(e, false));
 window.addEventListener('touchend', (e) => tryGlobalReady(e, true), { passive: false });
 //#endregion
 
-//#region 9) 绘制系统（draw + 绘制工具函数）=========
+//#region 9) 缁樺埗绯荤粺锛坉raw + 缁樺埗宸ュ叿鍑芥暟锛?========
 function drawRoundedRect(x, y, w, h, radius) {
   ctx.beginPath();
   ctx.moveTo(x + radius, y);
