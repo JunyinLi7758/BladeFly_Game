@@ -73,6 +73,16 @@ function assignRole(room) {
   return 'S';
 }
 
+function getRolePresence(room) {
+  let hasA = false;
+  let hasB = false;
+  for (const info of room.clients.values()) {
+    if (info.role === 'A') hasA = true;
+    if (info.role === 'B') hasB = true;
+  }
+  return { hasA, hasB };
+}
+
 // 重置房间状态
 function resetRoomState(room) {
   room.systemState = SystemState.IDLE;
@@ -238,6 +248,7 @@ wss.on('connection', (ws) => {
 setInterval(() => {
   for (const room of rooms.values()) {
     updateRoom(room);
+    const { hasA, hasB } = getRolePresence(room);
     broadcast(room, {
       type: 'state',
       systemState: room.systemState,
@@ -247,7 +258,9 @@ setInterval(() => {
       bReady: room.bReady,
       barFraction: room.barFraction,
       bCdEndTime: room.bCdEndTime,
-      bCdRemaining: room.bCdEndTime !== null ? Math.max(0, room.bCdEndTime - nowSec()) : 0
+      bCdRemaining: room.bCdEndTime !== null ? Math.max(0, room.bCdEndTime - nowSec()) : 0,
+      hasA,
+      hasB
     });
   }
 }, TICK_MS);

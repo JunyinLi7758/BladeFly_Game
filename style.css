@@ -173,6 +173,32 @@ canvas {
   color: #cfcfcf;
 }
 
+.room-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.room-row input {
+  width: 180px;
+  max-width: 52vw;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  outline: none;
+}
+
+.room-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.room-exit-btn {
+  background: #7a3131;
+}
+
 @keyframes roomEnter {
   from {
     opacity: 0;

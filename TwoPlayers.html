@@ -13,27 +13,31 @@
              <button class="job-btn" onclick="location.href='index.html'">
                 ← 模式选择
             </button>
-            <label class="job-btn" style="display:flex;align-items:center;gap:6px;">
+            <!-- <label class="job-btn" style="display:flex;align-items:center;gap:6px;">
                 房间:
                 <input id="roomIdInput" type="text" value="default" style="width:100px;margin-left:6px;" />
                 <button id="btnJoinRoom" class="job-btn" style="margin-left:6px;">加入</button>
-            </label>
+            </label> -->
             <button class="job-btn" data-job="Blade">剑纯</button>
             <button class="job-btn" data-job="Flower">万花</button>
             <button class="job-btn" data-job="Toxic">五毒</button>
             <!-- COM toggles removed (use keyboard 1/2 to toggle if needed) -->
         </div>
-
         <div id="preJoinRules" class="room-panel">
-            <div class="room-title">进入房间前请先读规则</div>
-            <div class="room-text">双人对战：一人读条（A），一人打断（B）。读条成功或打断成功即可获胜。</div>
-            <div class="room-text">操作：长按画布读条，松开取消；短按为打断；单击空白可准备开局。</div>
+            <div class="room-title">加入房间</div>
+            <div class="room-row">
+                <input id="roomIdInput" type="text" value="default" placeholder="请输入房间名" />
+                <button id="btnJoinRoom" class="job-btn">加入</button>
+            </div>
         </div>
 
         <div id="inRoomBanner" class="room-panel room-panel-live" style="display:none;">
             <div class="room-title">已进入房间</div>
             <div class="room-text"><span id="roomLabel">房间：</span> <span id="roomIdLabel">-</span></div>
             <div class="room-text"><span id="roleLabel">角色：</span> <span id="roleValue">-</span></div>
+            <div class="room-actions">
+                <button id="btnLeaveRoom" class="job-btn room-exit-btn">退出房间</button>
+            </div>
         </div>
 
         <canvas id="gameCanvas"></canvas>

@@ -168,13 +168,34 @@ let bState = BState.NO_CD;
 let message = '2P mode';
 
 // WS
-let ROOM_ID = (new URLSearchParams(location.search)).get('room') || 'default';
+// let ROOM_ID = (new URLSearchParams(location.search)).get('room') || 'default';
+
+// =========================
+// ROOM_ID：从 JS 里获取（不依赖 TwoPlayers.html / URL）
+// 你只需要改这里就能设定默认房间号
+// =========================
+const ROOM_ID_JS_DEFAULT = 'default'; // ← 改成你想要的默认 roomId，比如 'room_001'
+
+function getInitialRoomId() {
+  // 优先用本地保存的上次房间号
+  const saved = localStorage.getItem('roomId');
+  if (saved && saved.trim()) return saved.trim();
+
+  // 否则用 JS 内置默认值
+  return ROOM_ID_JS_DEFAULT;
+}
+
+let ROOM_ID = getInitialRoomId();
+
 const WS_URL = `ws://${location.hostname}:8080`;
 let ws = null;
 let wsConnected = false;
 let wsRole = null;
+let roomHasA = false;
+let roomHasB = false;
 let roomInputEl = null;
 let btnJoinRoomEl = null;
+let btnLeaveRoomEl = null;
 let preJoinEl = null;
 let inRoomEl = null;
 let roomIdLabelEl = null;
@@ -497,6 +518,8 @@ function connectWS() {
 
     if (msg.type === 'joined') {
       wsRole = msg.role || null;
+      roomHasA = false;
+      roomHasB = false;
       systemState = SystemState.IDLE;
       aState = AState.NO_CASTING;
       bState = BState.NO_CD;
@@ -521,6 +544,8 @@ function connectWS() {
       systemState = msg.systemState;
       aState = msg.aState;
       bState = msg.bState;
+      if (typeof msg.hasA === 'boolean') roomHasA = msg.hasA;
+      if (typeof msg.hasB === 'boolean') roomHasB = msg.hasB;
       aReady = msg.aReady;
       bReady = msg.bReady;
       barFraction = msg.barFraction;
@@ -600,6 +625,8 @@ function connectWS() {
   ws.addEventListener('close', () => {
     wsConnected = false;
     wsRole = null;
+    roomHasA = false;
+    roomHasB = false;
     if (pingIntervalId) { clearInterval(pingIntervalId); pingIntervalId = null; }
     updateRoomPanels();
   });
@@ -697,12 +724,118 @@ function updateRoomPanels() {
 
 // 按钮与开关绑定
 window.addEventListener('DOMContentLoaded', () => {
+  function ensureRoomUI() {
+  // 如果 HTML 已经有了这些元素，就不重复创建
+  const existInput = document.getElementById('roomIdInput');
+  const existBtn = document.getElementById('btnJoinRoom');
+  const existLeaveBtn = document.getElementById('btnLeaveRoom');
+  const existPre = document.getElementById('preJoinRules');
+  const existInRoom = document.getElementById('inRoomBanner');
+  if (existInput && existBtn && existLeaveBtn && existPre && existInRoom) return;
+
+  // 容器（悬浮在左上角，避免挡住画面中央）
+  const wrap = document.createElement('div');
+  wrap.id = 'roomPanelAuto';
+  wrap.style.cssText = `
+    position: fixed; left: 12px; top: 12px; z-index: 9999;
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 10px 12px; border-radius: 10px;
+    background: rgba(0,0,0,0.55); color: #fff;
+    font-family: "Microsoft YaHei", Arial; font-size: 14px;
+    backdrop-filter: blur(6px);
+  `;
+
+  // 预加入面板
+  const preJoin = document.createElement('div');
+  preJoin.id = 'preJoinRules';
+  preJoin.style.cssText = `display:flex; align-items:center; gap:8px;`;
+
+  const input = document.createElement('input');
+  input.id = 'roomIdInput';
+  input.placeholder = 'roomId';
+  input.style.cssText = `
+    width: 160px; padding: 6px 8px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.12); color: #fff; outline: none;
+  `;
+
+  const btn = document.createElement('button');
+  btn.id = 'btnJoinRoom';
+  btn.textContent = '加入';
+  btn.style.cssText = `
+    padding: 6px 10px; border-radius: 8px; border: 0;
+    background: rgba(255,255,255,0.18); color: #fff; cursor: pointer;
+  `;
+
+  preJoin.appendChild(input);
+  preJoin.appendChild(btn);
+
+  // 已加入面板
+  const inRoom = document.createElement('div');
+  inRoom.id = 'inRoomBanner';
+  inRoom.style.cssText = `display:none; flex-direction:column; gap:4px;`;
+
+  const line1 = document.createElement('div');
+  line1.innerHTML = `Room: <b id="roomIdLabel">-</b>`;
+
+  const line2 = document.createElement('div');
+  line2.innerHTML = `Role: <b id="roleValue">-</b>`;
+
+  const actions = document.createElement('div');
+  actions.style.cssText = 'display:flex;justify-content:flex-end;';
+  const btnLeave = document.createElement('button');
+  btnLeave.id = 'btnLeaveRoom';
+  btnLeave.textContent = '退出房间';
+  btnLeave.style.cssText = `
+    padding: 6px 10px; border-radius: 8px; border: 0;
+    background: rgba(200,80,80,0.8); color: #fff; cursor: pointer;
+  `;
+  actions.appendChild(btnLeave);
+
+  inRoom.appendChild(line1);
+  inRoom.appendChild(line2);
+  inRoom.appendChild(actions);
+
+  wrap.appendChild(preJoin);
+  wrap.appendChild(inRoom);
+
+  document.body.appendChild(wrap);
+}
+
+  ensureRoomUI();
+
   roomInputEl = document.getElementById('roomIdInput');
   btnJoinRoomEl = document.getElementById('btnJoinRoom');
+  btnLeaveRoomEl = document.getElementById('btnLeaveRoom');
   preJoinEl = document.getElementById('preJoinRules');
   inRoomEl = document.getElementById('inRoomBanner');
   roomIdLabelEl = document.getElementById('roomIdLabel');
   roleValueEl = document.getElementById('roleValue');
+
+  // 兜底：旧页面/重复 DOM 时，确保“当前 inRoomBanner”里一定有退出按钮。
+  if (inRoomEl) {
+    let leaveBtnInBanner = inRoomEl.querySelector('#btnLeaveRoom');
+    if (!leaveBtnInBanner) {
+      let actions = inRoomEl.querySelector('.room-actions');
+      if (!actions) {
+        actions = document.createElement('div');
+        actions.className = 'room-actions';
+        inRoomEl.appendChild(actions);
+      }
+      const btn = document.createElement('button');
+      btn.id = 'btnLeaveRoom';
+      btn.className = 'job-btn room-exit-btn';
+      btn.textContent = '退出房间';
+      btn.style.display = 'inline-block';
+      btn.style.visibility = 'visible';
+      actions.appendChild(btn);
+      leaveBtnInBanner = btn;
+    }
+    btnLeaveRoomEl = leaveBtnInBanner;
+    roomIdLabelEl = inRoomEl.querySelector('#roomIdLabel') || roomIdLabelEl;
+    roleValueEl = inRoomEl.querySelector('#roleValue') || roleValueEl;
+  }
+  console.log('[room-ui] inRoomBanner:', Boolean(inRoomEl), 'leaveBtn:', Boolean(btnLeaveRoomEl));
 
   // 初始化房间输入值
   if (roomInputEl) roomInputEl.value = ROOM_ID || 'default';
@@ -718,13 +851,41 @@ window.addEventListener('DOMContentLoaded', () => {
       wsRole = null;
     }
     ROOM_ID = newRoom;
+    localStorage.setItem('roomId', ROOM_ID);
+
     connectWS();
+  }
+
+  function leaveRoom() {
+    if (ws) {
+      try {
+        ws.close();
+      } catch (e) { /* ignore */ }
+      ws = null;
+    }
+    wsConnected = false;
+    wsRole = null;
+    systemState = SystemState.IDLE;
+    aState = AState.NO_CASTING;
+    bState = BState.NO_CD;
+    aReady = false;
+    bReady = false;
+    barFraction = 0.0;
+    resetBarVisuals();
+    stopAllSounds();
+    message = '2P mode';
+    updateRoomPanels();
   }
 
   if (btnJoinRoomEl) {
     btnJoinRoomEl.addEventListener('click', () => {
       const v = (roomInputEl && roomInputEl.value) ? roomInputEl.value.trim() : '';
       joinRoomById(v);
+    });
+  }
+  if (btnLeaveRoomEl) {
+    btnLeaveRoomEl.addEventListener('click', () => {
+      leaveRoom();
     });
   }
 
@@ -786,7 +947,7 @@ window.addEventListener('click', (e) => tryGlobalReady(e, false));
 window.addEventListener('touchend', (e) => tryGlobalReady(e, true), { passive: false });
 //#endregion
 
-//#region 9) 缁樺埗绯荤粺锛坉raw + 缁樺埗宸ュ叿鍑芥暟锛?========
+//#region 9) 画布========
 function drawRoundedRect(x, y, w, h, radius) {
   ctx.beginPath();
   ctx.moveTo(x + radius, y);
@@ -945,9 +1106,9 @@ function drawTexts() {
   ctx.fillText(message, WIDTH / 2, HEIGHT * 0.36);
   let subHint = '';
   if (wsConnected && wsRole && systemState === SystemState.IDLE) {
-    if ((wsRole === 'A' && !bReady) || (wsRole === 'B' && !aReady)) {
-      subHint = '等待对方加入...';
-    }
+    if (wsRole === 'S') subHint = '房间已满，当前为旁观';
+    else if (roomHasA && roomHasB) subHint = '人已集齐，点击屏幕准备';
+    else subHint = '等待玩家进入...';
   }
   if (subHint) {
     ctx.font = '12px "Microsoft YaHei", Arial';
@@ -986,11 +1147,11 @@ function drawTexts() {
   }
 
   // A/B ready 状态显示
-  ctx.font = '14px "Microsoft YaHei", Arial';
+  ctx.font = '18px "Microsoft YaHei", Arial';
   ctx.fillStyle = '#9f9';
   const aReadyMark = aReady ? '✓' : '-';
   const bReadyMark = bReady ? '✓' : '-';
-  ctx.fillText(`A Ready: ${aReadyMark}    B Ready: ${bReadyMark}`, WIDTH / 2, HEIGHT * 0.88);
+  ctx.fillText(`剑纯 Ready: ${aReadyMark}    气纯 Ready: ${bReadyMark}`, WIDTH / 2, HEIGHT * 0.88);
 
   ctx.font = '12px "Microsoft YaHei", Arial';
   ctx.fillStyle = '#8aa';
