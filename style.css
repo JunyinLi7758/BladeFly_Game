@@ -136,9 +136,9 @@ canvas {
 /* ========== 房间规则与状态提示 ========== */
 .room-panel {
   position: fixed;
-  top: 58px;
-  left: 10px;
+  top: 10px;
   right: 10px;
+  left: auto;
   z-index: 18;
   background: rgba(20, 20, 20, 0.85);
   color: #e6e6e6;
@@ -148,6 +148,8 @@ canvas {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: min(260px, calc(100vw - 20px));
+  max-width: calc(100vw - 20px);
   box-shadow: 0 6px 18px rgba(0,0,0,0.35);
 }
 
@@ -168,6 +170,27 @@ canvas {
   color: #9fe7b6;
 }
 
+.room-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.room-min-btn {
+  min-width: 24px;
+  height: 22px;
+  line-height: 22px;
+  padding: 0 6px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.room-panel-collapsed .room-text,
+.room-panel-collapsed .room-actions {
+  display: none;
+}
+
 .room-text {
   font-size: 12px;
   color: #cfcfcf;
@@ -180,8 +203,10 @@ canvas {
 }
 
 .room-row input {
-  width: 180px;
-  max-width: 52vw;
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  max-width: none;
   padding: 6px 8px;
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -265,6 +290,13 @@ canvas {
   .info {
     font-size: 11px;
     padding: 8px;
+  }
+
+  .room-panel {
+    top: 12px;
+    right: 8px;
+    width: min(240px, calc(100vw - 16px));
+    max-width: calc(100vw - 16px);
   }
 }
 

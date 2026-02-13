@@ -45,11 +45,15 @@ let logoHeight = 0;
 let logoWidth = 0, logoX = 0, logoY = 0;
 let titleFont = '', msgFont = '', resultFont = '';
 let logoAspect = 4;
+let uiShiftY = 0;
 
 function layout() {
+  // 主界面整体下移量（可按需调整）
+  uiShiftY = Math.max(0, Math.min(HEIGHT * 0.0, 90));
+
   iconSize = Math.min(WIDTH * 0.15, 100);
   iconX = (WIDTH - iconSize) / 2;
-  iconY = HEIGHT * 0.62;
+  iconY = HEIGHT * 0.62 + uiShiftY;
 
   titleSize  = Math.max(24, WIDTH * 0.06);
   msgSize    = Math.max(16, WIDTH * 0.04);
@@ -57,7 +61,7 @@ function layout() {
 
   barWidth  = Math.min(BAR_WIDTH_MAX, WIDTH * 0.8);
   barHeight = Math.max(20, HEIGHT * 0.08);
-  barY = HEIGHT * 0.47;
+  barY = HEIGHT * 0.47 + uiShiftY;
 
   const barX = (WIDTH - BAR_WIDTH_MAX) / 2;
   barXAdj = barX - (barWidth - BAR_WIDTH_MAX) / 2;
@@ -65,7 +69,7 @@ function layout() {
   logoHeight = Math.min(HEIGHT * 0.15, 80);
   logoWidth = logoHeight * logoAspect;
   logoX = (WIDTH - logoWidth) / 2;
-  logoY = HEIGHT * 0.05;
+  logoY = HEIGHT * 0.05 + uiShiftY;
 
   titleFont = `bold ${titleSize}px "Microsoft YaHei", Arial`;
   msgFont = `${msgSize}px "Microsoft YaHei", Arial`;
@@ -196,6 +200,7 @@ let roomHasB = false;
 let roomInputEl = null;
 let btnJoinRoomEl = null;
 let btnLeaveRoomEl = null;
+let btnMinRoomPanelEl = null;
 let preJoinEl = null;
 let inRoomEl = null;
 let roomIdLabelEl = null;
@@ -722,6 +727,15 @@ function updateRoomPanels() {
   if (roleValueEl) roleValueEl.textContent = '-';
 }
 
+function applyRoomPanelCollapsed(collapsed) {
+  if (!inRoomEl) return;
+  inRoomEl.classList.toggle('room-panel-collapsed', Boolean(collapsed));
+  if (btnMinRoomPanelEl) {
+    btnMinRoomPanelEl.textContent = collapsed ? '+' : '-';
+    btnMinRoomPanelEl.title = collapsed ? '展开' : '最小化';
+  }
+}
+
 // 按钮与开关绑定
 window.addEventListener('DOMContentLoaded', () => {
   function ensureRoomUI() {
@@ -729,19 +743,22 @@ window.addEventListener('DOMContentLoaded', () => {
   const existInput = document.getElementById('roomIdInput');
   const existBtn = document.getElementById('btnJoinRoom');
   const existLeaveBtn = document.getElementById('btnLeaveRoom');
+  const existMinBtn = document.getElementById('btnMinRoomPanel');
   const existPre = document.getElementById('preJoinRules');
   const existInRoom = document.getElementById('inRoomBanner');
-  if (existInput && existBtn && existLeaveBtn && existPre && existInRoom) return;
+  if (existInput && existBtn && existLeaveBtn && existMinBtn && existPre && existInRoom) return;
 
   // 容器（悬浮在左上角，避免挡住画面中央）
   const wrap = document.createElement('div');
   wrap.id = 'roomPanelAuto';
   wrap.style.cssText = `
-    position: fixed; left: 12px; top: 12px; z-index: 9999;
+    position: fixed; right: 10px; top: 10px; z-index: 9999;
     display: flex; flex-direction: column; gap: 8px;
     padding: 10px 12px; border-radius: 10px;
     background: rgba(0,0,0,0.55); color: #fff;
     font-family: "Microsoft YaHei", Arial; font-size: 14px;
+    width: min(260px, calc(100vw - 20px));
+    max-width: calc(100vw - 20px);
     backdrop-filter: blur(6px);
   `;
 
@@ -775,6 +792,19 @@ window.addEventListener('DOMContentLoaded', () => {
   inRoom.id = 'inRoomBanner';
   inRoom.style.cssText = `display:none; flex-direction:column; gap:4px;`;
 
+  const header = document.createElement('div');
+  header.className = 'room-header';
+  const title = document.createElement('div');
+  title.className = 'room-title';
+  title.textContent = '已进入房间';
+  const btnMin = document.createElement('button');
+  btnMin.id = 'btnMinRoomPanel';
+  btnMin.className = 'job-btn room-min-btn';
+  btnMin.textContent = '-';
+  btnMin.title = '最小化';
+  header.appendChild(title);
+  header.appendChild(btnMin);
+
   const line1 = document.createElement('div');
   line1.innerHTML = `Room: <b id="roomIdLabel">-</b>`;
 
@@ -792,6 +822,7 @@ window.addEventListener('DOMContentLoaded', () => {
   `;
   actions.appendChild(btnLeave);
 
+  inRoom.appendChild(header);
   inRoom.appendChild(line1);
   inRoom.appendChild(line2);
   inRoom.appendChild(actions);
@@ -807,6 +838,7 @@ window.addEventListener('DOMContentLoaded', () => {
   roomInputEl = document.getElementById('roomIdInput');
   btnJoinRoomEl = document.getElementById('btnJoinRoom');
   btnLeaveRoomEl = document.getElementById('btnLeaveRoom');
+  btnMinRoomPanelEl = document.getElementById('btnMinRoomPanel');
   preJoinEl = document.getElementById('preJoinRules');
   inRoomEl = document.getElementById('inRoomBanner');
   roomIdLabelEl = document.getElementById('roomIdLabel');
@@ -834,8 +866,30 @@ window.addEventListener('DOMContentLoaded', () => {
     btnLeaveRoomEl = leaveBtnInBanner;
     roomIdLabelEl = inRoomEl.querySelector('#roomIdLabel') || roomIdLabelEl;
     roleValueEl = inRoomEl.querySelector('#roleValue') || roleValueEl;
+    if (!btnMinRoomPanelEl) {
+      let header = inRoomEl.querySelector('.room-header');
+      if (!header) {
+        header = document.createElement('div');
+        header.className = 'room-header';
+        const title = document.createElement('div');
+        title.className = 'room-title';
+        title.textContent = '已进入房间';
+        header.appendChild(title);
+        inRoomEl.insertBefore(header, inRoomEl.firstChild);
+      }
+      const btn = document.createElement('button');
+      btn.id = 'btnMinRoomPanel';
+      btn.className = 'job-btn room-min-btn';
+      btn.textContent = '-';
+      btn.title = '最小化';
+      header.appendChild(btn);
+      btnMinRoomPanelEl = btn;
+    }
   }
   console.log('[room-ui] inRoomBanner:', Boolean(inRoomEl), 'leaveBtn:', Boolean(btnLeaveRoomEl));
+
+  const savedRoomPanelCollapsed = localStorage.getItem('roomPanelCollapsed') === '1';
+  applyRoomPanelCollapsed(savedRoomPanelCollapsed);
 
   // 初始化房间输入值
   if (roomInputEl) roomInputEl.value = ROOM_ID || 'default';
@@ -886,6 +940,13 @@ window.addEventListener('DOMContentLoaded', () => {
   if (btnLeaveRoomEl) {
     btnLeaveRoomEl.addEventListener('click', () => {
       leaveRoom();
+    });
+  }
+  if (btnMinRoomPanelEl) {
+    btnMinRoomPanelEl.addEventListener('click', () => {
+      const nextCollapsed = !inRoomEl.classList.contains('room-panel-collapsed');
+      applyRoomPanelCollapsed(nextCollapsed);
+      localStorage.setItem('roomPanelCollapsed', nextCollapsed ? '1' : '0');
     });
   }
 
@@ -1099,11 +1160,11 @@ function drawTexts() {
   ctx.font = titleFont;
   ctx.fillStyle = UI.textMain;
   ctx.textAlign = 'center';
-  ctx.fillText(UI.title, WIDTH / 2, HEIGHT * 0.25);
+  ctx.fillText(UI.title, WIDTH / 2, HEIGHT * 0.25 + uiShiftY);
 
   ctx.font = msgFont;
   ctx.fillStyle = UI.textSub;
-  ctx.fillText(message, WIDTH / 2, HEIGHT * 0.36);
+  ctx.fillText(message, WIDTH / 2, HEIGHT * 0.36 + uiShiftY);
   let subHint = '';
   if (wsConnected && wsRole && systemState === SystemState.IDLE) {
     if (wsRole === 'S') subHint = '房间已满，当前为旁观';
@@ -1113,7 +1174,7 @@ function drawTexts() {
   if (subHint) {
     ctx.font = '12px "Microsoft YaHei", Arial';
     ctx.fillStyle = '#a7a7a7';
-    ctx.fillText(subHint, WIDTH / 2, HEIGHT * 0.41);
+    ctx.fillText(subHint, WIDTH / 2, HEIGHT * 0.41 + uiShiftY);
   }
 
   let text;
@@ -1132,18 +1193,19 @@ function drawTexts() {
   }
 
   if (systemState === SystemState.PREPARE) {
-    const bigSize = Math.max(resultSize * 1.6, 48);
+    const bigSize = Math.max(resultSize * 1.2, 36);
+    const prepareTextY = Math.max(36, barY - 12);
     ctx.font = `bold ${bigSize}px "Microsoft YaHei", Arial`;
     ctx.textAlign = 'center';
     ctx.lineWidth = 6;
     ctx.strokeStyle = 'rgba(0,0,0,0.6)';
     ctx.fillStyle = '#ffd95a';
-    ctx.strokeText(text, WIDTH / 2, HEIGHT * 0.48);
-    ctx.fillText(text, WIDTH / 2, HEIGHT * 0.48);
+    ctx.strokeText(text, WIDTH / 2, prepareTextY);
+    ctx.fillText(text, WIDTH / 2, prepareTextY);
   } else {
     ctx.font = resultFont;
     ctx.fillStyle = UI.textResult;
-    ctx.fillText(text, WIDTH / 2, HEIGHT * 0.82);
+    ctx.fillText(text, WIDTH / 2, HEIGHT * 0.82 + uiShiftY);
   }
 
   // A/B ready 状态显示
@@ -1151,16 +1213,16 @@ function drawTexts() {
   ctx.fillStyle = '#9f9';
   const aReadyMark = aReady ? '✓' : '-';
   const bReadyMark = bReady ? '✓' : '-';
-  ctx.fillText(`剑纯 Ready: ${aReadyMark}    气纯 Ready: ${bReadyMark}`, WIDTH / 2, HEIGHT * 0.88);
+  ctx.fillText(`剑纯 Ready: ${aReadyMark}    气纯 Ready: ${bReadyMark}`, WIDTH / 2, HEIGHT * 0.88 + uiShiftY);
 
   ctx.font = '12px "Microsoft YaHei", Arial';
   ctx.fillStyle = '#8aa';
   const wsState = wsConnected ? `ON${wsRole ? `(${wsRole})` : ''}` : 'OFF';
-  ctx.fillText(`WS: ${wsState}`, WIDTH / 2, HEIGHT * 0.93);
+  ctx.fillText(`WS: ${wsState}`, WIDTH / 2, HEIGHT * 0.93 + uiShiftY);
   // debug: show CD values
   ctx.font = '11px "Microsoft YaHei", Arial';
   ctx.fillStyle = '#c9c';
-  ctx.fillText(`bCdRemaining: ${bCdRemaining.toFixed(2)}  bCdEndTime: ${bCdEndTime === null ? 'null' : bCdEndTime.toFixed(2)}`, WIDTH / 2, HEIGHT * 0.96);
+  ctx.fillText(`bCdRemaining: ${bCdRemaining.toFixed(2)}  bCdEndTime: ${bCdEndTime === null ? 'null' : bCdEndTime.toFixed(2)}`, WIDTH / 2, HEIGHT * 0.96 + uiShiftY);
 }
 
 function draw() {
