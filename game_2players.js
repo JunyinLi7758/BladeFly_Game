@@ -436,6 +436,11 @@ function updateRoundTimeout(now) {
 
   stopSound(currentBarSource);
   currentBarSource = null;
+  playDizzySound();
+}
+
+function playDizzySound() {
+  unlockAudio();
   stopSound(currentDizzySource);
   currentDizzySource = playSound('DIZZY', false);
 }
@@ -670,8 +675,7 @@ function connectWS() {
             showInterruptBar(performance.now() / 1000);
           }
           if (bWinReason === BWinReason.TIMEOUT) {
-            stopSound(currentDizzySource);
-            currentDizzySource = playSound('DIZZY', false);
+            playDizzySound();
           }
         }
       }
@@ -714,10 +718,18 @@ function setupCanvasInput() {
   const LONG_MS = 250;
   let longPressTimer = null;
   let longPressFired = false;
+  let audioUnlocked = false;
+
+  function ensureAudioUnlocked() {
+    if (audioUnlocked) return;
+    audioUnlocked = true;
+    unlockAudio();
+  }
 
   function startPress(e) {
     // 阻止触摸引发的滚动/点击
     if (e.cancelable) e.preventDefault();
+    ensureAudioUnlocked();
     longPressFired = false;
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
     longPressTimer = setTimeout(() => {
@@ -1335,4 +1347,3 @@ function gameLoop() {
 gameLoop();
 
 // Note: connectWS() is invoked when user clicks "加入" or when a room is provided via URL.
-gameLoop();
