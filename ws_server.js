@@ -11,7 +11,7 @@ const CAST_DURATION = 0.63;
 const B_CD_SECONDS = 3.0;
 const ROUND_TIMEOUT_SECONDS = Number.isFinite(Number(gameRules.roundTimeoutSeconds))
   ? Number(gameRules.roundTimeoutSeconds)
-  : 4.0;
+  : 3.0;
 
 // 系统状态
 const SystemState = {
