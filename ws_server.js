@@ -34,6 +34,11 @@ const BState = {
   IN_CD: 'IN_CD'
 };
 
+const BWinReason = {
+  INTERRUPT: 'INTERRUPT',
+  TIMEOUT: 'TIMEOUT'
+};
+
 // 获取当前时间（秒）
 function nowSec() {
   return Date.now() / 1000;
@@ -53,7 +58,8 @@ function createRoom(roomId) {
     roundStartTime: null,
     prepareStartTime: null,
     barFraction: 0.0,
-    bCdEndTime: null
+    bCdEndTime: null,
+    bWinReason: null
   };
 }
 
@@ -100,6 +106,7 @@ function resetRoomState(room) {
   room.prepareStartTime = null;
   room.barFraction = 0.0;
   room.bCdEndTime = null;
+  room.bWinReason = null;
 }
 
 // 向房间内所有客户端广播状态
@@ -128,6 +135,7 @@ function updateRoom(room) {
     room.systemState = SystemState.PREPARE;
     room.prepareStartTime = now;
     room.roundStartTime = null;
+    room.bWinReason = null;
   }
 
   // 准备状态 ==> 运行状态
@@ -140,6 +148,7 @@ function updateRoom(room) {
     room.bState = BState.NO_CD;
     room.startTime = null;
     room.barFraction = 0.0;
+    room.bWinReason = null;
   }
 
   // 运行状态超时：开局超过5秒，判定B获胜
@@ -152,6 +161,7 @@ function updateRoom(room) {
     room.aState = AState.NO_CASTING;
     room.startTime = null;
     room.barFraction = 0.0;
+    room.bWinReason = BWinReason.TIMEOUT;
   }
 
   // 运行状态下A的施法进度更新
@@ -203,6 +213,7 @@ function handleInput(room, role, action) {
       room.aReady = false;
       room.bReady = false;
       room.aState = AState.NO_CASTING;
+      room.bWinReason = BWinReason.INTERRUPT;
     }
     room.bState = BState.IN_CD;
     room.bCdEndTime = now + B_CD_SECONDS;
@@ -279,6 +290,7 @@ setInterval(() => {
       barFraction: room.barFraction,
       bCdEndTime: room.bCdEndTime,
       bCdRemaining: room.bCdEndTime !== null ? Math.max(0, room.bCdEndTime - nowSec()) : 0,
+      bWinReason: room.bWinReason,
       hasA,
       hasB
     });

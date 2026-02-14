@@ -166,9 +166,15 @@ const BState = {
   IN_CD: 'IN_CD'
 };
 
+const BWinReason = {
+  INTERRUPT: 'INTERRUPT',
+  TIMEOUT: 'TIMEOUT'
+};
+
 let systemState = SystemState.IDLE;
 let aState = AState.NO_CASTING;
 let bState = BState.NO_CD;
+let bWinReason = null;
 let message = '双人对战模式';
 
 // WS
@@ -230,6 +236,7 @@ let bComMode = false;
 let currentBarSource = null;
 let currentSkillSource = null;
 let currentFinishSource = null;
+let currentDizzySource = null;
 
 // B cooldown
 const B_CD_SECONDS = 3.0;
@@ -371,6 +378,7 @@ function BInterrupt(now) {
 
   if (systemState === SystemState.RUNNING && aState === AState.CASTING) {
     systemState = SystemState.BWIN;
+    bWinReason = BWinReason.INTERRUPT;
     aReady = false;
     bReady = false;
     aState = AState.NO_CASTING;
@@ -394,6 +402,7 @@ function maybeEnterPrepare(now) {
     systemState = SystemState.PREPARE;
     prepareStartTime = now;
     roundStartTime = null;
+    bWinReason = null;
   }
 }
 
@@ -419,6 +428,7 @@ function updateRoundTimeout(now) {
   if (now - roundStartTime < roundTimeoutSeconds) return;
 
   systemState = SystemState.BWIN;
+  bWinReason = BWinReason.TIMEOUT;
   aReady = false;
   bReady = false;
   aState = AState.NO_CASTING;
@@ -426,6 +436,8 @@ function updateRoundTimeout(now) {
 
   stopSound(currentBarSource);
   currentBarSource = null;
+  stopSound(currentDizzySource);
+  currentDizzySource = playSound('DIZZY', false);
 }
 
 function updateCasting(now) {
@@ -521,9 +533,11 @@ function stopAllSounds() {
   stopSound(currentBarSource);
   stopSound(currentSkillSource);
   stopSound(currentFinishSource);
+  stopSound(currentDizzySource);
   currentBarSource = null;
   currentSkillSource = null;
   currentFinishSource = null;
+  currentDizzySource = null;
 }
 //#endregion
 
@@ -568,6 +582,7 @@ function connectWS() {
       aReady = false;
       bReady = false;
       roundStartTime = null;
+      bWinReason = null;
       barFraction = 0.0;
       resetBarVisuals();
       updateRoomPanels();
@@ -592,6 +607,7 @@ function connectWS() {
       aReady = msg.aReady;
       bReady = msg.bReady;
       barFraction = msg.barFraction;
+      bWinReason = msg.bWinReason || null;
         // Prefer server-provided remaining seconds to avoid clock skew on mobile
         bCdRemaining = 0;
         if (msg.bCdRemaining !== undefined && msg.bCdRemaining !== null) {
@@ -616,14 +632,17 @@ function connectWS() {
       if (prevState !== systemState) {
         if (systemState === SystemState.RUNNING) {
           roundStartTime = performance.now() / 1000;
+          bWinReason = null;
           resetBarVisuals();
         }
         if (systemState === SystemState.PREPARE) {
           roundStartTime = null;
+          bWinReason = null;
           prepareStartTime = performance.now() / 1000;
         }
         if (systemState === SystemState.IDLE) {
           roundStartTime = null;
+          bWinReason = null;
           barFraction = 0.0;
           resetBarVisuals();
           if (wsRole === 'A') {
@@ -643,11 +662,17 @@ function connectWS() {
         if (systemState === SystemState.BWIN && prevState === SystemState.RUNNING) {
           stopSound(currentBarSource);
           currentBarSource = null;
-          if (wsRole !== 'B') {
+          if (bWinReason === BWinReason.INTERRUPT && wsRole !== 'B') {
             stopSound(currentSkillSource);
             currentSkillSource = playSound('skill_blade', false);
           }
-          showInterruptBar(performance.now() / 1000);
+          if (bWinReason === BWinReason.INTERRUPT) {
+            showInterruptBar(performance.now() / 1000);
+          }
+          if (bWinReason === BWinReason.TIMEOUT) {
+            stopSound(currentDizzySource);
+            currentDizzySource = playSound('DIZZY', false);
+          }
         }
       }
     }
@@ -966,6 +991,7 @@ window.addEventListener('DOMContentLoaded', () => {
     aReady = false;
     bReady = false;
     roundStartTime = null;
+    bWinReason = null;
     barFraction = 0.0;
     resetBarVisuals();
     stopAllSounds();
@@ -1223,7 +1249,11 @@ function drawTexts() {
   if (systemState === SystemState.AWIN) {
     text = '读完咯！';
   } else if (systemState === SystemState.BWIN) {
-    text = '飞到咯！';
+    if (bWinReason === BWinReason.TIMEOUT) {
+      text = '免控结束啦，你被剑冲了';
+    } else {
+      text = '被飞到咯！';
+    }
   } else if (systemState === SystemState.PREPARE) {
     let remaining = 3;
     if (prepareStartTime !== null) {
