@@ -61,7 +61,9 @@ function createRoom(roomId) {
     bCdEndTime: null,
     bWinReason: null,
     swapConfirmA: false,
-    swapConfirmB: false
+    swapConfirmB: false,
+    aWins: 0,
+    bWins: 0
   };
 }
 
@@ -176,6 +178,7 @@ function updateRoom(room) {
     room.startTime = null;
     room.barFraction = 0.0;
     room.bWinReason = BWinReason.TIMEOUT;
+    room.bWins += 1;
   }
 
   // 运行状态下A的施法进度更新
@@ -188,6 +191,7 @@ function updateRoom(room) {
       room.aReady = false;
       room.bReady = false;
       room.aState = AState.NO_CASTING;
+      room.aWins += 1;
     }
   }
 }
@@ -239,6 +243,7 @@ function handleInput(room, role, action) {
       room.bReady = false;
       room.aState = AState.NO_CASTING;
       room.bWinReason = BWinReason.INTERRUPT;
+      room.bWins += 1;
     }
     room.bState = BState.IN_CD;
     room.bCdEndTime = now + B_CD_SECONDS;
@@ -326,6 +331,8 @@ setInterval(() => {
       bWinReason: room.bWinReason,
       swapConfirmA: room.swapConfirmA,
       swapConfirmB: room.swapConfirmB,
+      aWins: room.aWins,
+      bWins: room.bWins,
       hasA,
       hasB
     });

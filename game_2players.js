@@ -230,6 +230,8 @@ let aReady = false;
 let bReady = false;
 let swapConfirmA = false;
 let swapConfirmB = false;
+let aWins = 0;
+let bWins = 0;
 
 // COM mode flags
 let aComMode = false;
@@ -631,6 +633,8 @@ function connectWS() {
       swapConfirmB = Boolean(msg.swapConfirmB);
       aReady = msg.aReady;
       bReady = msg.bReady;
+      aWins = Number.isFinite(Number(msg.aWins)) ? Number(msg.aWins) : aWins;
+      bWins = Number.isFinite(Number(msg.bWins)) ? Number(msg.bWins) : bWins;
       barFraction = msg.barFraction;
       bWinReason = msg.bWinReason || null;
         // Prefer server-provided remaining seconds to avoid clock skew on mobile
@@ -1404,6 +1408,11 @@ function drawTexts() {
   const aReadyMark = aReady ? '✓' : '-';
   const bReadyMark = bReady ? '✓' : '-';
   ctx.fillText(`气纯 Ready: ${aReadyMark}    剑纯 Ready: ${bReadyMark}`, WIDTH / 2, HEIGHT * 0.88 + uiShiftY);
+
+  const aLosses = bWins;
+  const bLosses = aWins;
+  ctx.fillStyle = '#cfcfcf';
+  ctx.fillText(`战绩  气纯 ${aWins}胜${aLosses}负    剑纯 ${bWins}胜${bLosses}负`, WIDTH / 2, HEIGHT * 0.92 + uiShiftY);
 
   // ctx.font = '12px "Microsoft YaHei", Arial';
   // ctx.fillStyle = '#8aa';
