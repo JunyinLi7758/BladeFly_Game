@@ -255,6 +255,12 @@ wss.on('connection', (ws) => {
   let room = null;
   let role = null;
 
+  function getCurrentRole() {
+    if (!room) return null;
+    const info = room.clients.get(ws);
+    return info ? info.role : null;
+  }
+
   // 处理客户端消息
   ws.on('message', (data) => {
     let msg = null;
@@ -284,11 +290,13 @@ wss.on('connection', (ws) => {
     }
 
     //  处理输入消息: {type:'input', action}
-    if (!room || !role) return;
+    if (!room) return;
+    const currentRole = getCurrentRole();
+    if (!currentRole) return;
 
     // 处理输入动作
     if (msg.type === 'input') {
-      handleInput(room, role, msg.action);
+      handleInput(room, currentRole, msg.action);
     }
   });
 
