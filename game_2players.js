@@ -25,7 +25,7 @@ const UI = {
   barBg: '#505050',
   iconFallback: '#4a6fa5',
   iconStroke: '#666',
-  title: '\u6B3A\u9A97\u5251\u7EAF\u6A21\u62DF\u5668v1.1'
+  title: '剑飞模拟器 v1.7'
 };
 let barRgb = BAR_COLOR_NORMAL;
 let barAlpha = 1.0;
@@ -169,7 +169,7 @@ const BState = {
 let systemState = SystemState.IDLE;
 let aState = AState.NO_CASTING;
 let bState = BState.NO_CD;
-let message = '2P mode';
+let message = '双人对战模式';
 
 // WS
 // let ROOM_ID = (new URLSearchParams(location.search)).get('room') || 'default';
@@ -965,21 +965,21 @@ window.addEventListener('keydown', (e) => {
   if (e.repeat) return;
   const now = performance.now() / 1000;
 
-  if (e.key === '1') {
-    ASetComMode(!aComMode);
-  }
-  if (e.key === '2') {
-    BSetComMode(!bComMode);
-  }
+  // if (e.key === '1') {
+  //   ASetComMode(!aComMode);
+  // }
+  // if (e.key === '2') {
+  //   BSetComMode(!bComMode);
+  // }
 
-  if (!aComMode) {
-    if (e.key === 'a' || e.key === 'j') AReady();
-    if (e.key === 'd') ACancelCasting(now);
-  }
+  // if (!aComMode) {
+  //   if (e.key === 'a' || e.key === 'j') AReady();
+  //   if (e.key === 'd') ACancelCasting(now);
+  // }
 
-  if (!bComMode) {
-    if (e.key === 'k') BInterrupt(now);
-  }
+  // if (!bComMode) {
+  //   if (e.key === 'k') BInterrupt(now);
+  // }
 });
 
 // 屏幕任意点击也能进入准备（但忽略按钮/输入上的点击；并避免与长按冲突）
@@ -1213,16 +1213,16 @@ function drawTexts() {
   ctx.fillStyle = '#9f9';
   const aReadyMark = aReady ? '✓' : '-';
   const bReadyMark = bReady ? '✓' : '-';
-  ctx.fillText(`剑纯 Ready: ${aReadyMark}    气纯 Ready: ${bReadyMark}`, WIDTH / 2, HEIGHT * 0.88 + uiShiftY);
+  ctx.fillText(`气纯 Ready: ${aReadyMark}    剑纯 Ready: ${bReadyMark}`, WIDTH / 2, HEIGHT * 0.88 + uiShiftY);
 
-  ctx.font = '12px "Microsoft YaHei", Arial';
-  ctx.fillStyle = '#8aa';
-  const wsState = wsConnected ? `ON${wsRole ? `(${wsRole})` : ''}` : 'OFF';
-  ctx.fillText(`WS: ${wsState}`, WIDTH / 2, HEIGHT * 0.93 + uiShiftY);
-  // debug: show CD values
-  ctx.font = '11px "Microsoft YaHei", Arial';
-  ctx.fillStyle = '#c9c';
-  ctx.fillText(`bCdRemaining: ${bCdRemaining.toFixed(2)}  bCdEndTime: ${bCdEndTime === null ? 'null' : bCdEndTime.toFixed(2)}`, WIDTH / 2, HEIGHT * 0.96 + uiShiftY);
+  // ctx.font = '12px "Microsoft YaHei", Arial';
+  // ctx.fillStyle = '#8aa';
+  // const wsState = wsConnected ? `ON${wsRole ? `(${wsRole})` : ''}` : 'OFF';
+  // ctx.fillText(`WS: ${wsState}`, WIDTH / 2, HEIGHT * 0.93 + uiShiftY);
+  // // debug: show CD values
+  // ctx.font = '11px "Microsoft YaHei", Arial';
+  // ctx.fillStyle = '#c9c';
+  // ctx.fillText(`bCdRemaining: ${bCdRemaining.toFixed(2)}  bCdEndTime: ${bCdEndTime === null ? 'null' : bCdEndTime.toFixed(2)}`, WIDTH / 2, HEIGHT * 0.96 + uiShiftY);
 }
 
 function draw() {
