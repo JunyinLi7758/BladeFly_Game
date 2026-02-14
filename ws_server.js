@@ -2,12 +2,16 @@
 // Minimal WS server for 2P state sync.
 const http = require('http');
 const WebSocket = require('ws');
+const gameRules = require('./game_rules.json');
 
 const PORT = 8080;
 const TICK_MS = 15;
 const PREPARE_SECONDS = 3.0;
 const CAST_DURATION = 0.63;
 const B_CD_SECONDS = 3.0;
+const ROUND_TIMEOUT_SECONDS = Number.isFinite(Number(gameRules.roundTimeoutSeconds))
+  ? Number(gameRules.roundTimeoutSeconds)
+  : 5.0;
 
 // 系统状态
 const SystemState = {
@@ -46,6 +50,7 @@ function createRoom(roomId) {
     aReady: false,
     bReady: false,
     startTime: null,
+    roundStartTime: null,
     prepareStartTime: null,
     barFraction: 0.0,
     bCdEndTime: null
@@ -91,6 +96,7 @@ function resetRoomState(room) {
   room.aReady = false;
   room.bReady = false;
   room.startTime = null;
+  room.roundStartTime = null;
   room.prepareStartTime = null;
   room.barFraction = 0.0;
   room.bCdEndTime = null;
@@ -121,6 +127,7 @@ function updateRoom(room) {
        room.aReady && room.bReady) {
     room.systemState = SystemState.PREPARE;
     room.prepareStartTime = now;
+    room.roundStartTime = null;
   }
 
   // 准备状态 ==> 运行状态
@@ -128,8 +135,21 @@ function updateRoom(room) {
       room.prepareStartTime !== null &&
       now - room.prepareStartTime >= PREPARE_SECONDS) {
     room.systemState = SystemState.RUNNING;
+    room.roundStartTime = now;
     room.aState = AState.NO_CASTING;
     room.bState = BState.NO_CD;
+    room.startTime = null;
+    room.barFraction = 0.0;
+  }
+
+  // 运行状态超时：开局超过5秒，判定B获胜
+  if (room.systemState === SystemState.RUNNING &&
+      room.roundStartTime !== null &&
+      now - room.roundStartTime >= ROUND_TIMEOUT_SECONDS) {
+    room.systemState = SystemState.BWIN;
+    room.aReady = false;
+    room.bReady = false;
+    room.aState = AState.NO_CASTING;
     room.startTime = null;
     room.barFraction = 0.0;
   }

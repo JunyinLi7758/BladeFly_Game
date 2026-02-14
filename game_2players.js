@@ -214,6 +214,9 @@ let aCancelUntil = null;
 // Casting
 const CAST_DURATION = 0.63;
 let barFraction = 0.0;
+const DEFAULT_ROUND_TIMEOUT_SECONDS = 5.0;
+let roundTimeoutSeconds = DEFAULT_ROUND_TIMEOUT_SECONDS;
+let roundStartTime = null;
 
 // A/B ready flags
 let aReady = false;
@@ -236,6 +239,21 @@ let bCdRemaining = 0;
 let clockOffset = 0; // server_time - local_time (seconds)
 let pingIntervalId = null;
 
+async function loadSharedGameRules() {
+  try {
+    const res = await fetch('./game_rules.json', { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const nextTimeout = Number(data.roundTimeoutSeconds);
+    if (Number.isFinite(nextTimeout) && nextTimeout > 0) {
+      roundTimeoutSeconds = nextTimeout;
+    }
+  } catch (e) {
+    // Ignore loading failures and keep defaults.
+  }
+}
+
+loadSharedGameRules();
 
 //#endregion
 
@@ -375,6 +393,7 @@ function maybeEnterPrepare(now) {
   ) && aReady && bReady) {
     systemState = SystemState.PREPARE;
     prepareStartTime = now;
+    roundStartTime = null;
   }
 }
 
@@ -385,12 +404,28 @@ function updatePrepare(now) {
     systemState = SystemState.RUNNING;
     aState = AState.NO_CASTING;
     bState = BState.NO_CD;
+    roundStartTime = now;
     startTime = null;
     barFraction = 0.0;
     resetBarVisuals();
   }
   AUpdateStrategyRandom();
   BUpdateStrategyRandom();
+}
+
+function updateRoundTimeout(now) {
+  if (systemState !== SystemState.RUNNING) return;
+  if (roundStartTime === null) return;
+  if (now - roundStartTime < roundTimeoutSeconds) return;
+
+  systemState = SystemState.BWIN;
+  aReady = false;
+  bReady = false;
+  aState = AState.NO_CASTING;
+  barFraction = 0.0;
+
+  stopSound(currentBarSource);
+  currentBarSource = null;
 }
 
 function updateCasting(now) {
@@ -473,6 +508,8 @@ function SystemUpdate() {
   }
 
   if (systemState === SystemState.RUNNING) {
+    updateRoundTimeout(now);
+    if (systemState !== SystemState.RUNNING) return;
     if (aComMode) UpdateAStrategy(now);
     UpdateA(now);
     UpdateB(now);
@@ -530,6 +567,7 @@ function connectWS() {
       bState = BState.NO_CD;
       aReady = false;
       bReady = false;
+      roundStartTime = null;
       barFraction = 0.0;
       resetBarVisuals();
       updateRoomPanels();
@@ -577,12 +615,15 @@ function connectWS() {
 
       if (prevState !== systemState) {
         if (systemState === SystemState.RUNNING) {
+          roundStartTime = performance.now() / 1000;
           resetBarVisuals();
         }
         if (systemState === SystemState.PREPARE) {
+          roundStartTime = null;
           prepareStartTime = performance.now() / 1000;
         }
         if (systemState === SystemState.IDLE) {
+          roundStartTime = null;
           barFraction = 0.0;
           resetBarVisuals();
           if (wsRole === 'A') {
@@ -924,6 +965,7 @@ window.addEventListener('DOMContentLoaded', () => {
     bState = BState.NO_CD;
     aReady = false;
     bReady = false;
+    roundStartTime = null;
     barFraction = 0.0;
     resetBarVisuals();
     stopAllSounds();
