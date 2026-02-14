@@ -1272,6 +1272,12 @@ function drawTexts() {
       remaining = Math.max(0, 3 - (performance.now() / 1000 - prepareStartTime));
     }
     text = `准备倒计时：${Math.ceil(remaining)}秒`;
+  } else if (systemState === SystemState.RUNNING) {
+    let remaining = roundTimeoutSeconds;
+    if (roundStartTime !== null) {
+      remaining = Math.max(0, roundTimeoutSeconds - (performance.now() / 1000 - roundStartTime));
+    }
+    text = `生太极免控：${remaining.toFixed(1)}`;
   } else {    
     text = `游戏开始！`;
   }
