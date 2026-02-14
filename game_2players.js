@@ -731,6 +731,18 @@ function connectWS() {
 
 //#region  8) Input: 按键与画布长按/短按逻辑 ======
 let recentLongPress = 0; // seconds, used to avoid double-triggering click after long-press
+let suppressGlobalInputUntil = 0;
+
+function suppressGlobalInputBriefly() {
+  suppressGlobalInputUntil = performance.now() / 1000 + 0.35;
+}
+
+function isUiControlTarget(target) {
+  if (!target || typeof target.closest !== 'function') return false;
+  return Boolean(target.closest(
+    '#preJoinRules, #inRoomBanner, #roomPanelAuto, .room-panel, .job-btn, button, input, label, a, select, textarea'
+  ));
+}
 
 // Canvas press handling: 长按触发 A start_cast，松开触发 cancel；短按作为打断（B）或准备（A）
 function setupCanvasInput() {
@@ -740,6 +752,7 @@ function setupCanvasInput() {
   let longPressTimer = null;
   let longPressFired = false;
   let audioUnlocked = false;
+  let pressFromCanvas = false;
 
   function ensureAudioUnlocked() {
     if (audioUnlocked) return;
@@ -750,6 +763,7 @@ function setupCanvasInput() {
   function startPress(e) {
     // 阻止触摸引发的滚动/点击
     if (e.cancelable) e.preventDefault();
+    pressFromCanvas = true;
     ensureAudioUnlocked();
     longPressFired = false;
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
@@ -763,6 +777,8 @@ function setupCanvasInput() {
   }
 
   function endPress(e) {
+    if (!pressFromCanvas) return;
+    pressFromCanvas = false;
     if (e && e.cancelable) e.preventDefault();
     const now = performance.now() / 1000;
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
@@ -794,6 +810,11 @@ function setupCanvasInput() {
   // 鼠标
   canvas.addEventListener('mousedown', startPress);
   window.addEventListener('mouseup', endPress);
+  window.addEventListener('blur', () => {
+    pressFromCanvas = false;
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    longPressFired = false;
+  });
 
   // 触摸
   canvas.addEventListener('touchstart', startPress, { passive: false });
@@ -1072,17 +1093,20 @@ window.addEventListener('DOMContentLoaded', () => {
 
   if (btnJoinRoomEl) {
     btnJoinRoomEl.addEventListener('click', () => {
+      suppressGlobalInputBriefly();
       const v = (roomInputEl && roomInputEl.value) ? roomInputEl.value.trim() : '';
       joinRoomById(v);
     });
   }
   if (btnLeaveRoomEl) {
     btnLeaveRoomEl.addEventListener('click', () => {
+      suppressGlobalInputBriefly();
       leaveRoom();
     });
   }
   if (btnSwapRoleEl) {
     btnSwapRoleEl.addEventListener('click', () => {
+      suppressGlobalInputBriefly();
       if (!wsConnected) return;
       if (wsRole !== 'A' && wsRole !== 'B') return;
       sendInput('swap_confirm');
@@ -1094,6 +1118,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   if (btnMinRoomPanelEl) {
     btnMinRoomPanelEl.addEventListener('click', () => {
+      suppressGlobalInputBriefly();
       const nextCollapsed = !inRoomEl.classList.contains('room-panel-collapsed');
       applyRoomPanelCollapsed(nextCollapsed);
       localStorage.setItem('roomPanelCollapsed', nextCollapsed ? '1' : '0');
@@ -1135,9 +1160,9 @@ window.addEventListener('keydown', (e) => {
 // 屏幕任意点击也能进入准备（但忽略按钮/输入上的点击；并避免与长按冲突）
 let lastGlobalReadyTime = 0;
 function tryGlobalReady(e, isTouch = false) {
-  const tag = (e && e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
-  if (['BUTTON', 'INPUT', 'LABEL', 'A', 'SELECT', 'TEXTAREA'].includes(tag)) return;
   const now = performance.now() / 1000;
+  if (now < suppressGlobalInputUntil) return;
+  if (e && isUiControlTarget(e.target)) return;
   if (now - recentLongPress < 0.6) return; // 忽略紧接着的 click（来自长按）
   if (now - lastGlobalReadyTime < 0.6) return; // 防止 touchend + click 双触发
 
