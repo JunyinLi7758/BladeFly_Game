@@ -36,7 +36,7 @@ export async function preloadAllSounds() {
   await Promise.all([
     loadAudioBuffer('bar', 'sound/bar.MP3'),
     loadAudioBuffer('finish', 'sound/finish.MP3'),
-    loadAudioBuffer('DIZZY', 'sound/jianchong.OGG'),
+    loadAudioBuffer('DIZZY', 'sound/jianchong.MP3'),
 
     loadAudioBuffer('skill_blade', 'sound/skill_blade.MP3'),
     loadAudioBuffer('skill_flower', 'sound/skill_flower.MP3'),
