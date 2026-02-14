@@ -218,6 +218,11 @@ canvas {
 .room-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
+}
+
+.room-swap-btn {
+  background: #2e5d79;
 }
 
 .room-exit-btn {

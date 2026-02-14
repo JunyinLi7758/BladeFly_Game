@@ -59,7 +59,9 @@ function createRoom(roomId) {
     prepareStartTime: null,
     barFraction: 0.0,
     bCdEndTime: null,
-    bWinReason: null
+    bWinReason: null,
+    swapConfirmA: false,
+    swapConfirmB: false
   };
 }
 
@@ -107,6 +109,18 @@ function resetRoomState(room) {
   room.barFraction = 0.0;
   room.bCdEndTime = null;
   room.bWinReason = null;
+  room.swapConfirmA = false;
+  room.swapConfirmB = false;
+}
+
+function swapRoles(room) {
+  for (const [ws, info] of room.clients.entries()) {
+    if (info.role === 'A') info.role = 'B';
+    else if (info.role === 'B') info.role = 'A';
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'role_swapped', role: info.role, roomId: room.roomId }));
+    }
+  }
 }
 
 // 向房间内所有客户端广播状态
@@ -185,6 +199,17 @@ function handleInput(room, role, action) {
   if (action === 'ready') {
     if (role === 'A') room.aReady = true;
     if (role === 'B') room.bReady = true;
+    return;
+  }
+
+  // 双方确认后交换角色
+  if (action === 'swap_confirm') {
+    if (role === 'A') room.swapConfirmA = true;
+    if (role === 'B') room.swapConfirmB = true;
+    if (room.swapConfirmA && room.swapConfirmB) {
+      swapRoles(room);
+      resetRoomState(room);
+    }
     return;
   }
 
@@ -291,6 +316,8 @@ setInterval(() => {
       bCdEndTime: room.bCdEndTime,
       bCdRemaining: room.bCdEndTime !== null ? Math.max(0, room.bCdEndTime - nowSec()) : 0,
       bWinReason: room.bWinReason,
+      swapConfirmA: room.swapConfirmA,
+      swapConfirmB: room.swapConfirmB,
       hasA,
       hasB
     });

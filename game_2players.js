@@ -206,6 +206,7 @@ let roomHasB = false;
 let roomInputEl = null;
 let btnJoinRoomEl = null;
 let btnLeaveRoomEl = null;
+let btnSwapRoleEl = null;
 let btnMinRoomPanelEl = null;
 let preJoinEl = null;
 let inRoomEl = null;
@@ -227,6 +228,8 @@ let roundStartTime = null;
 // A/B ready flags
 let aReady = false;
 let bReady = false;
+let swapConfirmA = false;
+let swapConfirmB = false;
 
 // COM mode flags
 let aComMode = false;
@@ -581,6 +584,8 @@ function connectWS() {
       wsRole = msg.role || null;
       roomHasA = false;
       roomHasB = false;
+      swapConfirmA = false;
+      swapConfirmB = false;
       systemState = SystemState.IDLE;
       aState = AState.NO_CASTING;
       bState = BState.NO_CD;
@@ -601,6 +606,19 @@ function connectWS() {
       return;
     }
 
+    if (msg.type === 'role_swapped') {
+      wsRole = msg.role || wsRole;
+      swapConfirmA = false;
+      swapConfirmB = false;
+      updateRoomPanels();
+      if (wsRole === 'A') {
+        message = '角色已交换：你现在是气纯。';
+      } else if (wsRole === 'B') {
+        message = '角色已交换：你现在是剑纯。';
+      }
+      return;
+    }
+
     if (msg.type === 'state') {
       const prevState = systemState;
       const prevAState = aState;
@@ -609,6 +627,8 @@ function connectWS() {
       bState = msg.bState;
       if (typeof msg.hasA === 'boolean') roomHasA = msg.hasA;
       if (typeof msg.hasB === 'boolean') roomHasB = msg.hasB;
+      swapConfirmA = Boolean(msg.swapConfirmA);
+      swapConfirmB = Boolean(msg.swapConfirmB);
       aReady = msg.aReady;
       bReady = msg.bReady;
       barFraction = msg.barFraction;
@@ -679,6 +699,7 @@ function connectWS() {
           }
         }
       }
+      updateRoomPanels();
     }
   });
 
@@ -797,12 +818,23 @@ function updateRoomPanels() {
       else if (wsRole === 'B') roleValueEl.textContent = '剑纯';
       else roleValueEl.textContent = '旁观';
     }
+    if (btnSwapRoleEl) {
+      const canSwap = wsRole === 'A' || wsRole === 'B';
+      btnSwapRoleEl.disabled = !canSwap;
+      if (wsRole === 'A' && swapConfirmA) btnSwapRoleEl.textContent = '已确认换角';
+      else if (wsRole === 'B' && swapConfirmB) btnSwapRoleEl.textContent = '已确认换角';
+      else btnSwapRoleEl.textContent = '确认换角';
+    }
     return;
   }
   preJoinEl.style.display = 'flex';
   inRoomEl.style.display = 'none';
   if (roomIdLabelEl) roomIdLabelEl.textContent = '-';
   if (roleValueEl) roleValueEl.textContent = '-';
+  if (btnSwapRoleEl) {
+    btnSwapRoleEl.disabled = true;
+    btnSwapRoleEl.textContent = '确认换角';
+  }
 }
 
 function applyRoomPanelCollapsed(collapsed) {
@@ -890,7 +922,14 @@ window.addEventListener('DOMContentLoaded', () => {
   line2.innerHTML = `Role: <b id="roleValue">-</b>`;
 
   const actions = document.createElement('div');
-  actions.style.cssText = 'display:flex;justify-content:flex-end;';
+  actions.className = 'room-actions';
+  const btnSwap = document.createElement('button');
+  btnSwap.id = 'btnSwapRole';
+  btnSwap.textContent = '确认换角';
+  btnSwap.style.cssText = `
+    padding: 6px 10px; border-radius: 8px; border: 0;
+    background: rgba(64,130,170,0.85); color: #fff; cursor: pointer;
+  `;
   const btnLeave = document.createElement('button');
   btnLeave.id = 'btnLeaveRoom';
   btnLeave.textContent = '退出房间';
@@ -898,6 +937,7 @@ window.addEventListener('DOMContentLoaded', () => {
     padding: 6px 10px; border-radius: 8px; border: 0;
     background: rgba(200,80,80,0.8); color: #fff; cursor: pointer;
   `;
+  actions.appendChild(btnSwap);
   actions.appendChild(btnLeave);
 
   inRoom.appendChild(header);
@@ -916,6 +956,7 @@ window.addEventListener('DOMContentLoaded', () => {
   roomInputEl = document.getElementById('roomIdInput');
   btnJoinRoomEl = document.getElementById('btnJoinRoom');
   btnLeaveRoomEl = document.getElementById('btnLeaveRoom');
+  btnSwapRoleEl = document.getElementById('btnSwapRole');
   btnMinRoomPanelEl = document.getElementById('btnMinRoomPanel');
   preJoinEl = document.getElementById('preJoinRules');
   inRoomEl = document.getElementById('inRoomBanner');
@@ -942,6 +983,22 @@ window.addEventListener('DOMContentLoaded', () => {
       leaveBtnInBanner = btn;
     }
     btnLeaveRoomEl = leaveBtnInBanner;
+    let swapBtnInBanner = inRoomEl.querySelector('#btnSwapRole');
+    if (!swapBtnInBanner) {
+      let actions = inRoomEl.querySelector('.room-actions');
+      if (!actions) {
+        actions = document.createElement('div');
+        actions.className = 'room-actions';
+        inRoomEl.appendChild(actions);
+      }
+      const btn = document.createElement('button');
+      btn.id = 'btnSwapRole';
+      btn.className = 'job-btn room-swap-btn';
+      btn.textContent = '确认换角';
+      actions.insertBefore(btn, actions.firstChild);
+      swapBtnInBanner = btn;
+    }
+    btnSwapRoleEl = swapBtnInBanner;
     roomIdLabelEl = inRoomEl.querySelector('#roomIdLabel') || roomIdLabelEl;
     roleValueEl = inRoomEl.querySelector('#roleValue') || roleValueEl;
     if (!btnMinRoomPanelEl) {
@@ -1002,6 +1059,8 @@ window.addEventListener('DOMContentLoaded', () => {
     bState = BState.NO_CD;
     aReady = false;
     bReady = false;
+    swapConfirmA = false;
+    swapConfirmB = false;
     roundStartTime = null;
     bWinReason = null;
     barFraction = 0.0;
@@ -1020,6 +1079,17 @@ window.addEventListener('DOMContentLoaded', () => {
   if (btnLeaveRoomEl) {
     btnLeaveRoomEl.addEventListener('click', () => {
       leaveRoom();
+    });
+  }
+  if (btnSwapRoleEl) {
+    btnSwapRoleEl.addEventListener('click', () => {
+      if (!wsConnected) return;
+      if (wsRole !== 'A' && wsRole !== 'B') return;
+      sendInput('swap_confirm');
+      if (wsRole === 'A') swapConfirmA = true;
+      if (wsRole === 'B') swapConfirmB = true;
+      message = '已确认换角，等待对方确认...';
+      updateRoomPanels();
     });
   }
   if (btnMinRoomPanelEl) {
@@ -1250,6 +1320,11 @@ function drawTexts() {
     if (wsRole === 'S') subHint = '房间已满，当前为旁观';
     else if (roomHasA && roomHasB) subHint = '人已集齐，点击屏幕准备';
     else subHint = '等待玩家进入...';
+  }
+  if (wsConnected && (swapConfirmA || swapConfirmB)) {
+    const aMark = swapConfirmA ? '✓' : '-';
+    const bMark = swapConfirmB ? '✓' : '-';
+    subHint = `换角确认 气纯:${aMark} 剑纯:${bMark}`;
   }
   if (subHint) {
     ctx.font = '12px "Microsoft YaHei", Arial';
