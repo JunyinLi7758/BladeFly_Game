@@ -207,6 +207,7 @@ let roomInputEl = null;
 let btnJoinRoomEl = null;
 let btnLeaveRoomEl = null;
 let btnSwapRoleEl = null;
+let btnResetScoreEl = null;
 let btnMinRoomPanelEl = null;
 let preJoinEl = null;
 let inRoomEl = null;
@@ -232,6 +233,11 @@ let swapConfirmA = false;
 let swapConfirmB = false;
 let aWins = 0;
 let bWins = 0;
+
+function resetScoreboardLocal() {
+  aWins = 0;
+  bWins = 0;
+}
 
 // COM mode flags
 let aComMode = false;
@@ -593,6 +599,7 @@ function connectWS() {
       bState = BState.NO_CD;
       aReady = false;
       bReady = false;
+      resetScoreboardLocal();
       roundStartTime = null;
       bWinReason = null;
       barFraction = 0.0;
@@ -727,6 +734,7 @@ function connectWS() {
     wsRole = null;
     roomHasA = false;
     roomHasB = false;
+    resetScoreboardLocal();
     if (pingIntervalId) { clearInterval(pingIntervalId); pingIntervalId = null; }
     updateRoomPanels();
   });
@@ -850,6 +858,11 @@ function updateRoomPanels() {
       else if (wsRole === 'B' && swapConfirmB) btnSwapRoleEl.textContent = '已确认换角';
       else btnSwapRoleEl.textContent = '确认换角';
     }
+    if (btnResetScoreEl) {
+      const canResetScore = wsRole === 'A' || wsRole === 'B';
+      btnResetScoreEl.disabled = !canResetScore;
+      btnResetScoreEl.textContent = '清零战绩';
+    }
     return;
   }
   preJoinEl.style.display = 'flex';
@@ -859,6 +872,10 @@ function updateRoomPanels() {
   if (btnSwapRoleEl) {
     btnSwapRoleEl.disabled = true;
     btnSwapRoleEl.textContent = '确认换角';
+  }
+  if (btnResetScoreEl) {
+    btnResetScoreEl.disabled = true;
+    btnResetScoreEl.textContent = '清零战绩';
   }
 }
 
@@ -955,6 +972,13 @@ window.addEventListener('DOMContentLoaded', () => {
     padding: 6px 10px; border-radius: 8px; border: 0;
     background: rgba(64,130,170,0.85); color: #fff; cursor: pointer;
   `;
+  const btnResetScore = document.createElement('button');
+  btnResetScore.id = 'btnResetScore';
+  btnResetScore.textContent = '清零战绩';
+  btnResetScore.style.cssText = `
+    padding: 6px 10px; border-radius: 8px; border: 0;
+    background: rgba(190,130,40,0.9); color: #fff; cursor: pointer;
+  `;
   const btnLeave = document.createElement('button');
   btnLeave.id = 'btnLeaveRoom';
   btnLeave.textContent = '退出房间';
@@ -963,6 +987,7 @@ window.addEventListener('DOMContentLoaded', () => {
     background: rgba(200,80,80,0.8); color: #fff; cursor: pointer;
   `;
   actions.appendChild(btnSwap);
+  actions.appendChild(btnResetScore);
   actions.appendChild(btnLeave);
 
   inRoom.appendChild(header);
@@ -982,6 +1007,7 @@ window.addEventListener('DOMContentLoaded', () => {
   btnJoinRoomEl = document.getElementById('btnJoinRoom');
   btnLeaveRoomEl = document.getElementById('btnLeaveRoom');
   btnSwapRoleEl = document.getElementById('btnSwapRole');
+  btnResetScoreEl = document.getElementById('btnResetScore');
   btnMinRoomPanelEl = document.getElementById('btnMinRoomPanel');
   preJoinEl = document.getElementById('preJoinRules');
   inRoomEl = document.getElementById('inRoomBanner');
@@ -1024,6 +1050,22 @@ window.addEventListener('DOMContentLoaded', () => {
       swapBtnInBanner = btn;
     }
     btnSwapRoleEl = swapBtnInBanner;
+    let resetScoreBtnInBanner = inRoomEl.querySelector('#btnResetScore');
+    if (!resetScoreBtnInBanner) {
+      let actions = inRoomEl.querySelector('.room-actions');
+      if (!actions) {
+        actions = document.createElement('div');
+        actions.className = 'room-actions';
+        inRoomEl.appendChild(actions);
+      }
+      const btn = document.createElement('button');
+      btn.id = 'btnResetScore';
+      btn.className = 'job-btn room-reset-btn';
+      btn.textContent = '清零战绩';
+      actions.insertBefore(btn, btnLeaveRoomEl || null);
+      resetScoreBtnInBanner = btn;
+    }
+    btnResetScoreEl = resetScoreBtnInBanner;
     roomIdLabelEl = inRoomEl.querySelector('#roomIdLabel') || roomIdLabelEl;
     roleValueEl = inRoomEl.querySelector('#roleValue') || roleValueEl;
     if (!btnMinRoomPanelEl) {
@@ -1086,6 +1128,7 @@ window.addEventListener('DOMContentLoaded', () => {
     bReady = false;
     swapConfirmA = false;
     swapConfirmB = false;
+    resetScoreboardLocal();
     roundStartTime = null;
     bWinReason = null;
     barFraction = 0.0;
@@ -1117,6 +1160,17 @@ window.addEventListener('DOMContentLoaded', () => {
       if (wsRole === 'A') swapConfirmA = true;
       if (wsRole === 'B') swapConfirmB = true;
       message = '已确认换角，等待对方确认...';
+      updateRoomPanels();
+    });
+  }
+  if (btnResetScoreEl) {
+    btnResetScoreEl.addEventListener('click', () => {
+      suppressGlobalInputBriefly();
+      if (!wsConnected) return;
+      if (wsRole !== 'A' && wsRole !== 'B') return;
+      sendInput('reset_stats');
+      resetScoreboardLocal();
+      message = '战绩已清零。';
       updateRoomPanels();
     });
   }

@@ -99,7 +99,8 @@ function getRolePresence(room) {
 }
 
 // 重置房间状态
-function resetRoomState(room) {
+function resetRoomState(room, options = {}) {
+  const resetScore = Boolean(options.resetScore);
   room.systemState = SystemState.IDLE;
   room.aState = AState.NO_CASTING;
   room.bState = BState.NO_CD;
@@ -113,6 +114,10 @@ function resetRoomState(room) {
   room.bWinReason = null;
   room.swapConfirmA = false;
   room.swapConfirmB = false;
+  if (resetScore) {
+    room.aWins = 0;
+    room.bWins = 0;
+  }
 }
 
 function swapRoles(room) {
@@ -217,6 +222,14 @@ function handleInput(room, role, action) {
     return;
   }
 
+  // 手动清零战绩（仅对战双方可触发）
+  if (action === 'reset_stats') {
+    if (role === 'A' || role === 'B') {
+      resetRoomState(room, { resetScore: true });
+    }
+    return;
+  }
+
   // A玩家开始读条
   if (action === 'start_cast' && role === 'A') {
     if (room.systemState !== SystemState.RUNNING) return;
@@ -280,7 +293,7 @@ wss.on('connection', (ws) => {
       room = getRoom(msg.roomId || 'default');
       role = msg.role || assignRole(room);
       room.clients.set(ws, { role });
-      resetRoomState(room);
+      resetRoomState(room, { resetScore: true });
       ws.send(JSON.stringify({ type: 'joined', role, roomId: room.roomId }));
       return;
     }
@@ -307,7 +320,12 @@ wss.on('connection', (ws) => {
 
   // 处理连接关闭
   ws.on('close', () => {
-    if (room) room.clients.delete(ws);
+    if (!room) return;
+    room.clients.delete(ws);
+    const { hasA, hasB } = getRolePresence(room);
+    if (!hasA && !hasB) {
+      resetRoomState(room, { resetScore: true });
+    }
   });
 });
 
