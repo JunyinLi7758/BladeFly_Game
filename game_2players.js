@@ -1685,7 +1685,18 @@ function drawTexts() {
   const aLosses = bWins;
   const bLosses = aWins;
   ctx.fillStyle = '#cfcfcf';
-  ctx.fillText(`战绩  气纯 ${aWins}胜${aLosses}负    剑纯 ${bWins}胜${bLosses}负`, WIDTH / 2, HEIGHT * 0.92 + uiShiftY);
+  if (wsConnected && (wsRole === 'A' || wsRole === 'B')) {
+    const myWins = wsRole === 'A' ? aWins : bWins;
+    const myLosses = wsRole === 'A' ? aLosses : bLosses;
+    const oppWins = wsRole === 'A' ? bWins : aWins;
+    const oppLosses = wsRole === 'A' ? bLosses : aLosses;
+    const myName = wsRole === 'A' ? '气纯' : '剑纯';
+    const oppName = wsRole === 'A' ? '剑纯' : '气纯';
+    ctx.fillText(`我的战绩(${myName})  ${myWins}胜${myLosses}负`, WIDTH / 2, HEIGHT * 0.92 + uiShiftY);
+    ctx.fillText(`对手战绩(${oppName})  ${oppWins}胜${oppLosses}负`, WIDTH / 2, HEIGHT * 0.955 + uiShiftY);
+  } else {
+    ctx.fillText(`战绩  气纯 ${aWins}胜${aLosses}负    剑纯 ${bWins}胜${bLosses}负`, WIDTH / 2, HEIGHT * 0.92 + uiShiftY);
+  }
 
   // ctx.font = '12px "Microsoft YaHei", Arial';
   // ctx.fillStyle = '#8aa';
