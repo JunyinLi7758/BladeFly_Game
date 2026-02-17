@@ -33,6 +33,8 @@ let barFadeActive = false;
 let barFadeStartTime = 0;
 const BAR_FADE_DURATION = 0.4;
 let barHitFraction = 0.0;
+let timeoutImpactActive = false;
+let timeoutImpactStartTime = 0;
 
 // 方案A：布局缓存
 let layoutDirty = true;
@@ -1520,6 +1522,53 @@ function drawCastBar() {
   }
 }
 
+function updateTimeoutImpactState(now) {
+  const shouldShow = systemState === SystemState.BWIN && bWinReason === BWinReason.TIMEOUT;
+  if (shouldShow) {
+    if (!timeoutImpactActive) {
+      timeoutImpactActive = true;
+      timeoutImpactStartTime = now;
+    }
+    return;
+  }
+  timeoutImpactActive = false;
+}
+
+function drawTimeoutImpactEffect(now) {
+  if (!timeoutImpactActive) return;
+
+  const elapsed = Math.max(0, now - timeoutImpactStartTime);
+  const pulse = 0.5 + 0.5 * Math.sin(elapsed * 16);
+  const decay = Math.exp(-elapsed * 1.6);
+
+  // 红橙色冲击闪屏
+  const flashAlpha = Math.min(0.42, 0.16 + 0.2 * decay + 0.08 * pulse);
+  ctx.fillStyle = `rgba(220, 60, 40, ${flashAlpha})`;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  // 中心冲击波
+  const waveProgress = Math.min(1, elapsed / 0.8);
+  const maxRadius = Math.hypot(WIDTH, HEIGHT) * 0.6;
+  const radius = 24 + waveProgress * maxRadius;
+  const waveAlpha = Math.max(0, 0.7 * (1 - waveProgress));
+  ctx.beginPath();
+  ctx.arc(WIDTH * 0.5, HEIGHT * 0.5, radius, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(255, 220, 160, ${waveAlpha})`;
+  ctx.lineWidth = 6;
+  ctx.stroke();
+
+  // 额外命中提示
+  const hitScale = 1 + 0.05 * Math.sin(elapsed * 14);
+  const hitSize = Math.max(32, Math.floor(resultSize * 1.35 * hitScale));
+  ctx.font = `bold ${hitSize}px "Microsoft YaHei", Arial`;
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = 'rgba(30, 0, 0, 0.75)';
+  ctx.fillStyle = `rgba(255, 235, 180, ${Math.min(1, 0.7 + 0.3 * pulse)})`;
+  ctx.strokeText('剑冲命中', WIDTH / 2, HEIGHT * 0.22 + uiShiftY);
+  ctx.fillText('剑冲命中', WIDTH / 2, HEIGHT * 0.22 + uiShiftY);
+}
+
 function drawTexts() {
   ctx.font = titleFont;
   ctx.fillStyle = UI.textMain;
@@ -1624,6 +1673,7 @@ function draw() {
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
   const now = performance.now() / 1000;
+  updateTimeoutImpactState(now);
 
   // Logo
   drawLogo();
@@ -1639,6 +1689,9 @@ function draw() {
 
   // Cast bar
   drawCastBar();
+
+  // Timeout-specific VFX layer (剑冲命中)
+  drawTimeoutImpactEffect(now);
 }
 // #endregion
 
