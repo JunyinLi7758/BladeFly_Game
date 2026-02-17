@@ -1678,7 +1678,7 @@ function drawTexts() {
   ctx.fillStyle = '#9f9';
   const aReadyMark = aReady ? '✓' : '-';
   const bReadyMark = bReady ? '✓' : '-';
-  ctx.fillText(`气纯 Ready: ${aReadyMark}    剑纯 Ready: ${bReadyMark}`, WIDTH / 2, HEIGHT * 0.88 + uiShiftY);
+  ctx.fillText(`气纯 Ready: ${aReadyMark}    剑纯 Ready: ${bReadyMark}`, WIDTH / 2, HEIGHT * 0.84 + uiShiftY);
 
   const aLosses = bWins;
   const bLosses = aWins;
@@ -1690,10 +1690,10 @@ function drawTexts() {
     const oppLosses = wsRole === 'A' ? bLosses : aLosses;
     const myName = wsRole === 'A' ? '气纯' : '剑纯';
     const oppName = wsRole === 'A' ? '剑纯' : '气纯';
-    ctx.fillText(`我的战绩(${myName})  ${myWins}胜${myLosses}负`, WIDTH / 2, HEIGHT * 0.92 + uiShiftY);
-    ctx.fillText(`对手战绩(${oppName})  ${oppWins}胜${oppLosses}负`, WIDTH / 2, HEIGHT * 0.955 + uiShiftY);
+    ctx.fillText(`我的战绩(${myName})  ${myWins}胜${myLosses}负`, WIDTH / 2, HEIGHT * 0.88 + uiShiftY);
+    ctx.fillText(`对手战绩(${oppName})  ${oppWins}胜${oppLosses}负`, WIDTH / 2, HEIGHT * 0.915 + uiShiftY);
   } else {
-    ctx.fillText(`战绩  气纯 ${aWins}胜${aLosses}负    剑纯 ${bWins}胜${bLosses}负`, WIDTH / 2, HEIGHT * 0.92 + uiShiftY);
+    ctx.fillText(`战绩  气纯 ${aWins}胜${aLosses}负    剑纯 ${bWins}胜${bLosses}负`, WIDTH / 2, HEIGHT * 0.88 + uiShiftY);
   }
 
   // ctx.font = '12px "Microsoft YaHei", Arial';
