@@ -158,7 +158,7 @@ let currentSkillSource = null;
 
 const BREAKBAR_API_URL = `http://${location.hostname || 'localhost'}:8080/api/breakbar/leaderboard`;
 const BATCH_TEST_ROUNDS = 4;
-const BATCH_NEXT_ROUND_DELAY = 0.7;
+const BATCH_NEXT_ROUND_DELAY = 3.0;
 let batchTestActive = false;
 let batchNextRoundAt = null;
 let batchResults = [];
