@@ -1629,7 +1629,7 @@ function drawTexts() {
 
   let text;
   const interruptMsText = (lastInterruptElapsedMs !== null)
-    ? lastInterruptElapsedMs.toFixed(2)
+    ? lastInterruptElapsedMs.toFixed(0)
     : null;
   if (systemState === SystemState.AWIN) {
     if (interruptMsText !== null) {
