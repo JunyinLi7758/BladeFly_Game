@@ -638,9 +638,9 @@ function connectWS() {
       resetBarVisuals();
       updateRoomPanels();
       if (wsRole === 'A') {
-        message = '你是气纯：长按读条，松开取消。';
+        message = '你是气纯：长按生太极，松开取消.';
       } else if (wsRole === 'B') {
-        message = '你是剑纯：短按打断，注意冷却。';
+        message = '你是剑纯：点击屏幕剑飞 ';
       } else {
         message = '旁观中：等待下一局。';
       }
