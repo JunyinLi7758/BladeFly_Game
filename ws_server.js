@@ -14,6 +14,7 @@ const B_CD_SECONDS = 3.0;
 const ROUND_TIMEOUT_SECONDS = Number.isFinite(Number(gameRules.roundTimeoutSeconds))
   ? Number(gameRules.roundTimeoutSeconds)
   : 4.0;
+const EMPTY_ROOM_TTL_SECONDS = 120;
 const BREAKBAR_LEADERBOARD_FILE = path.join(__dirname, 'breakbar_leaderboard.json');
 const MAX_LEADERBOARD_ENTRIES = 500;
 
@@ -34,12 +35,41 @@ function loadBreakbarLeaderboardStore() {
   }
 }
 
-function saveBreakbarLeaderboardStore(store) {
+let leaderboardSaveTimer = null;
+let leaderboardSaveInFlight = false;
+let leaderboardDirty = false;
+const LEADERBOARD_SAVE_DEBOUNCE_MS = 1200;
+
+async function flushBreakbarLeaderboardStore() {
+  if (leaderboardSaveInFlight) {
+    leaderboardDirty = true;
+    return;
+  }
+  leaderboardSaveInFlight = true;
+  leaderboardDirty = false;
   try {
-    fs.writeFileSync(BREAKBAR_LEADERBOARD_FILE, JSON.stringify(store, null, 2), 'utf8');
+    await fs.promises.writeFile(
+      BREAKBAR_LEADERBOARD_FILE,
+      JSON.stringify(breakbarLeaderboardStore, null, 2),
+      'utf8'
+    );
   } catch (e) {
     console.warn('[leaderboard] failed to save file:', e.message);
+  } finally {
+    leaderboardSaveInFlight = false;
+    if (leaderboardDirty) {
+      scheduleBreakbarLeaderboardSave(LEADERBOARD_SAVE_DEBOUNCE_MS);
+    }
   }
+}
+
+function scheduleBreakbarLeaderboardSave(delayMs = LEADERBOARD_SAVE_DEBOUNCE_MS) {
+  leaderboardDirty = true;
+  if (leaderboardSaveTimer) clearTimeout(leaderboardSaveTimer);
+  leaderboardSaveTimer = setTimeout(() => {
+    leaderboardSaveTimer = null;
+    flushBreakbarLeaderboardStore();
+  }, Math.max(0, delayMs));
 }
 
 function normalizeAvgSuccessMs(value) {
@@ -137,6 +167,7 @@ function createRoom(roomId) {
   return {
     roomId,
     clients: new Map(), // ws -> { role }
+    emptySince: null,
     systemState: SystemState.IDLE,
     aState: AState.NO_CASTING,
     bState: BState.NO_CD,
@@ -161,7 +192,9 @@ const rooms = new Map();
 // 鑾峰彇鎴栧垱寤烘埧闂?
 function getRoom(roomId) {
   if (!rooms.has(roomId)) rooms.set(roomId, createRoom(roomId));
-  return rooms.get(roomId);
+  const room = rooms.get(roomId);
+  room.emptySince = null;
+  return room;
 }
 
 // 鍒嗛厤鎴块棿鍐呰鑹睞銆丅鎴朣
@@ -405,7 +438,7 @@ async function handleBreakbarLeaderboardPost(req, res) {
   if (breakbarLeaderboardStore.entries.length > MAX_LEADERBOARD_ENTRIES) {
     breakbarLeaderboardStore.entries = breakbarLeaderboardStore.entries.slice(0, MAX_LEADERBOARD_ENTRIES);
   }
-  saveBreakbarLeaderboardStore(breakbarLeaderboardStore);
+  scheduleBreakbarLeaderboardSave();
 
   sendJson(res, 200, {
     ok: true,
@@ -469,12 +502,18 @@ wss.on('connection', (ws) => {
     //  鍔犲叆鎴块棿娑堟伅: {type:'join', roomId?, role?}
     if (msg.type === 'join') {
       if (room) {
+        const oldRoom = room;
         room.clients.delete(ws);
+        if (oldRoom.clients.size === 0) {
+          oldRoom.emptySince = nowSec();
+          resetRoomState(oldRoom, { resetScore: true });
+        }
       }
       // 鑾峰彇鎴栧垱寤烘埧闂达紝鍒嗛厤瑙掕壊
       room = getRoom(msg.roomId || 'default');
       role = msg.role || assignRole(room);
       room.clients.set(ws, { role });
+      room.emptySince = null;
       resetRoomState(room, { resetScore: true });
       ws.send(JSON.stringify({ type: 'joined', role, roomId: room.roomId }));
       return;
@@ -504,8 +543,8 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     if (!room) return;
     room.clients.delete(ws);
-    const { hasA, hasB } = getRolePresence(room);
-    if (!hasA && !hasB) {
+    if (room.clients.size === 0) {
+      room.emptySince = nowSec();
       resetRoomState(room, { resetScore: true });
     }
   });
@@ -515,7 +554,17 @@ wss.on('connection', (ws) => {
 // 瀹氭椂鏇存柊鎴块棿鐘舵€佸苟骞挎挱
 // 骞挎挱淇℃伅锛?{type:'state', systemState, aState, bState, aReady, bReady, barFraction, bCdEndTime, bCdRemaining}
 setInterval(() => {
-  for (const room of rooms.values()) {
+  const now = nowSec();
+  for (const [roomId, room] of rooms.entries()) {
+    if (room.clients.size === 0) {
+      if (room.emptySince === null) room.emptySince = now;
+      if (now - room.emptySince >= EMPTY_ROOM_TTL_SECONDS) {
+        rooms.delete(roomId);
+      }
+      continue;
+    }
+
+    room.emptySince = null;
     updateRoom(room);
     const { hasA, hasB } = getRolePresence(room);
     broadcast(room, {
@@ -539,6 +588,28 @@ setInterval(() => {
     });
   }
 }, TICK_MS);
+
+function persistLeaderboardSyncOnExit() {
+  try {
+    fs.writeFileSync(
+      BREAKBAR_LEADERBOARD_FILE,
+      JSON.stringify(breakbarLeaderboardStore, null, 2),
+      'utf8'
+    );
+  } catch (e) {
+    console.warn('[leaderboard] final save failed:', e.message);
+  }
+}
+
+process.on('SIGINT', () => {
+  persistLeaderboardSyncOnExit();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  persistLeaderboardSyncOnExit();
+  process.exit(0);
+});
 
 server.listen(PORT, () => {
   console.log(`WS server running on :${PORT}`);
