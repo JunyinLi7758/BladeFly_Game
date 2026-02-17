@@ -1536,9 +1536,7 @@ function startResultImpact(type, now) {
 
 function updateResultImpactState(now) {
   if (systemState !== lastResultImpactState || bWinReason !== lastResultImpactReason) {
-    if (systemState === SystemState.BWIN && bWinReason === BWinReason.TIMEOUT) {
-      startResultImpact('timeout', now);
-    } else if (systemState === SystemState.BWIN && bWinReason === BWinReason.INTERRUPT) {
+    if (systemState === SystemState.BWIN && bWinReason === BWinReason.INTERRUPT) {
       startResultImpact('interrupt', now);
     } else if (systemState === SystemState.AWIN) {
       startResultImpact('awin', now);

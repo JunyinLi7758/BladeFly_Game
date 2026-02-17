@@ -1,6 +1,8 @@
 ﻿// ws_server.js
 // Minimal WS server for 2P state sync.
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const WebSocket = require('ws');
 const gameRules = require('./game_rules.json');
 
@@ -12,6 +14,92 @@ const B_CD_SECONDS = 3.0;
 const ROUND_TIMEOUT_SECONDS = Number.isFinite(Number(gameRules.roundTimeoutSeconds))
   ? Number(gameRules.roundTimeoutSeconds)
   : 4.0;
+const BREAKBAR_LEADERBOARD_FILE = path.join(__dirname, 'breakbar_leaderboard.json');
+const MAX_LEADERBOARD_ENTRIES = 500;
+
+function defaultLeaderboardStore() {
+  return { entries: [] };
+}
+
+function loadBreakbarLeaderboardStore() {
+  try {
+    if (!fs.existsSync(BREAKBAR_LEADERBOARD_FILE)) return defaultLeaderboardStore();
+    const raw = fs.readFileSync(BREAKBAR_LEADERBOARD_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.entries)) return defaultLeaderboardStore();
+    return { entries: parsed.entries };
+  } catch (e) {
+    console.warn('[leaderboard] failed to load file:', e.message);
+    return defaultLeaderboardStore();
+  }
+}
+
+function saveBreakbarLeaderboardStore(store) {
+  try {
+    fs.writeFileSync(BREAKBAR_LEADERBOARD_FILE, JSON.stringify(store, null, 2), 'utf8');
+  } catch (e) {
+    console.warn('[leaderboard] failed to save file:', e.message);
+  }
+}
+
+function normalizeAvgSuccessMs(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return null;
+  return num;
+}
+
+function normalizeSuccessRate(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return 0;
+  return Math.max(0, Math.min(1, num));
+}
+
+function compareLeaderboardEntries(a, b) {
+  if (b.successRate !== a.successRate) return b.successRate - a.successRate;
+  const aAvg = Number.isFinite(a.avgSuccessMs) ? a.avgSuccessMs : Number.POSITIVE_INFINITY;
+  const bAvg = Number.isFinite(b.avgSuccessMs) ? b.avgSuccessMs : Number.POSITIVE_INFINITY;
+  if (aAvg !== bAvg) return aAvg - bAvg;
+  return a.createdAt - b.createdAt;
+}
+
+let breakbarLeaderboardStore = loadBreakbarLeaderboardStore();
+
+function toRankedLeaderboard(limit = 100) {
+  return [...breakbarLeaderboardStore.entries]
+    .sort(compareLeaderboardEntries)
+    .slice(0, Math.max(1, Math.min(200, limit)))
+    .map((entry, idx) => ({ rank: idx + 1, ...entry }));
+}
+
+function sendJson(res, statusCode, payload) {
+  res.writeHead(statusCode, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type'
+  });
+  res.end(JSON.stringify(payload));
+}
+
+function parseBody(req) {
+  return new Promise((resolve, reject) => {
+    let raw = '';
+    req.on('data', (chunk) => {
+      raw += chunk.toString();
+      if (raw.length > 64 * 1024) {
+        reject(new Error('Payload too large'));
+      }
+    });
+    req.on('end', () => {
+      try {
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch (e) {
+        reject(new Error('Invalid JSON body'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
 
 // 绯荤粺鐘舵€?
 const SystemState = {
@@ -272,7 +360,94 @@ function handleInput(room, role, action) {
 }
 
 
-const server = http.createServer();
+async function handleBreakbarLeaderboardGet(req, res) {
+  const fullUrl = new URL(req.url, 'http://localhost');
+  const limitParam = Number(fullUrl.searchParams.get('limit'));
+  const limit = Number.isFinite(limitParam) ? limitParam : 100;
+  sendJson(res, 200, {
+    entries: toRankedLeaderboard(limit),
+    total: breakbarLeaderboardStore.entries.length
+  });
+}
+
+async function handleBreakbarLeaderboardPost(req, res) {
+  let body = null;
+  try {
+    body = await parseBody(req);
+  } catch (e) {
+    sendJson(res, 400, { error: e.message || 'Bad request' });
+    return;
+  }
+
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  if (!name || name.length > 20) {
+    sendJson(res, 400, { error: 'Name is required and must be 1-20 chars' });
+    return;
+  }
+
+  const successRate = normalizeSuccessRate(body.successRate);
+  const avgSuccessMs = normalizeAvgSuccessMs(body.avgSuccessMs);
+  const totalRounds = Number.isFinite(Number(body.totalRounds)) ? Math.max(1, Math.floor(Number(body.totalRounds))) : 4;
+  const successCount = Number.isFinite(Number(body.successCount)) ? Math.max(0, Math.floor(Number(body.successCount))) : 0;
+
+  const entry = {
+    id: String(Date.now()) + '_' + Math.random().toString(36).slice(2, 8),
+    name,
+    successRate,
+    avgSuccessMs,
+    totalRounds,
+    successCount,
+    createdAt: Date.now()
+  };
+
+  breakbarLeaderboardStore.entries.push(entry);
+  breakbarLeaderboardStore.entries.sort(compareLeaderboardEntries);
+  if (breakbarLeaderboardStore.entries.length > MAX_LEADERBOARD_ENTRIES) {
+    breakbarLeaderboardStore.entries = breakbarLeaderboardStore.entries.slice(0, MAX_LEADERBOARD_ENTRIES);
+  }
+  saveBreakbarLeaderboardStore(breakbarLeaderboardStore);
+
+  sendJson(res, 200, {
+    ok: true,
+    entry,
+    entries: toRankedLeaderboard(100),
+    total: breakbarLeaderboardStore.entries.length
+  });
+}
+
+async function handleHttpRequest(req, res) {
+  if (!req.url) {
+    sendJson(res, 400, { error: 'Missing URL' });
+    return;
+  }
+
+  if (req.method === 'OPTIONS') {
+    sendJson(res, 204, { ok: true });
+    return;
+  }
+
+  const pathname = req.url.split('?')[0];
+  if (pathname === '/api/breakbar/leaderboard' && req.method === 'GET') {
+    await handleBreakbarLeaderboardGet(req, res);
+    return;
+  }
+  if (pathname === '/api/breakbar/leaderboard' && req.method === 'POST') {
+    await handleBreakbarLeaderboardPost(req, res);
+    return;
+  }
+
+  res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+  res.end('Not Found');
+}
+
+const server = http.createServer((req, res) => {
+  handleHttpRequest(req, res).catch((err) => {
+    console.error('[http] unexpected error', err);
+    if (!res.headersSent) {
+      sendJson(res, 500, { error: 'Internal Server Error' });
+    }
+  });
+});
 const wss = new WebSocket.Server({ server });
 
 //    
@@ -368,5 +543,9 @@ setInterval(() => {
 server.listen(PORT, () => {
   console.log(`WS server running on :${PORT}`);
 });
+
+
+
+
 
 

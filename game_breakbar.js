@@ -35,6 +35,13 @@ let barFadeActive = false;
 let barFadeStartTime = 0;
 const BAR_FADE_DURATION = 0.4;
 let barHitFraction = 0.0;
+let resultImpactType = null;
+let resultImpactStartTime = 0;
+const RESULT_IMPACT_DURATION = {
+  timeout: 0.58,
+  interrupt: 0.72,
+  awin: 0.72
+};
 
 // 方案A：布局缓存
 let layoutDirty = true;
@@ -148,6 +155,15 @@ let message = "有本事断我看看？~ 点击屏幕开始";
 
 let currentBarSource = null;
 let currentSkillSource = null;
+
+const BREAKBAR_API_URL = `http://${location.hostname || 'localhost'}:8080/api/breakbar/leaderboard`;
+const BATCH_TEST_ROUNDS = 4;
+const BATCH_NEXT_ROUND_DELAY = 0.7;
+let batchTestActive = false;
+let batchNextRoundAt = null;
+let batchResults = [];
+let batchSummary = null;
+let leaderboardEls = null;
 // #endregion
 
 
@@ -224,6 +240,11 @@ function AResetBarVisuals() {
   barHitFraction = 0;
 }
 
+function startResultImpact(type, now) {
+  resultImpactType = type;
+  resultImpactStartTime = now;
+}
+
 function AStartPrepare(now) {
   AResetBarVisuals();
 
@@ -264,6 +285,8 @@ function AHandleBreak(now) {
   barAlpha = 1.0;
   barFadeActive = true;
   barFadeStartTime = now;
+  startResultImpact('interrupt', now);
+  onRoundFinished(true, reactionTime * 1000, now);
 
   state = "RESULT";
 }
@@ -302,6 +325,243 @@ async function handleAction() {
   // SAFE RUNNING：无效点击（不做事）
 }
 // #endregion
+
+
+function summarizeBatchResults(results) {
+  const successCount = results.filter((item) => item.success).length;
+  const successRate = successCount / BATCH_TEST_ROUNDS;
+  const successTimes = results.filter((item) => item.success).map((item) => item.timeMs);
+  const avgSuccessMs = successTimes.length
+    ? successTimes.reduce((sum, value) => sum + value, 0) / successTimes.length
+    : null;
+  return {
+    totalRounds: BATCH_TEST_ROUNDS,
+    successCount,
+    successRate,
+    avgSuccessMs
+  };
+}
+
+function formatBatchSummary(summary) {
+  if (!summary) return '当前测试：--';
+  const rateText = `${(summary.successRate * 100).toFixed(1)}%`;
+  const avgText = summary.avgSuccessMs === null ? '--' : `${summary.avgSuccessMs.toFixed(1)} ms`;
+  return `4次测试：成功率 ${rateText}，平均成功时间 ${avgText}`;
+}
+
+function updateCurrentSummaryLabel() {
+  if (!leaderboardEls || !leaderboardEls.currentTimeLabel) return;
+  leaderboardEls.currentTimeLabel.textContent = formatBatchSummary(batchSummary);
+}
+
+function updateBatchButtonState() {
+  if (!leaderboardEls || !leaderboardEls.batchTestBtn) return;
+  if (batchTestActive) {
+    leaderboardEls.batchTestBtn.disabled = true;
+    leaderboardEls.batchTestBtn.textContent = `测试中 ${batchResults.length}/${BATCH_TEST_ROUNDS}`;
+  } else {
+    leaderboardEls.batchTestBtn.disabled = false;
+    leaderboardEls.batchTestBtn.textContent = '4次连续测试';
+  }
+}
+
+function startBatchTest() {
+  const now = performance.now() / 1000;
+  batchTestActive = true;
+  batchNextRoundAt = null;
+  batchResults = [];
+  batchSummary = null;
+  updateCurrentSummaryLabel();
+  updateBatchButtonState();
+  AStartPrepare(now);
+}
+
+function onRoundFinished(success, timeMs, now) {
+  if (!batchTestActive) return;
+  batchResults.push({ success: Boolean(success), timeMs: success ? Number(timeMs) : null });
+  updateBatchButtonState();
+
+  if (batchResults.length >= BATCH_TEST_ROUNDS) {
+    batchTestActive = false;
+    batchNextRoundAt = null;
+    batchSummary = summarizeBatchResults(batchResults);
+    message = `测试完成：${formatBatchSummary(batchSummary)}。可输入用户名保存。`;
+    updateCurrentSummaryLabel();
+    updateBatchButtonState();
+    return;
+  }
+
+  batchNextRoundAt = now + BATCH_NEXT_ROUND_DELAY;
+}
+
+function normalizeLeaderboardEntry(entry) {
+  const successRate = Number(entry.successRate);
+  const avgRaw = entry.avgSuccessMs === null || entry.avgSuccessMs === undefined ? null : Number(entry.avgSuccessMs);
+  return {
+    rank: Number(entry.rank),
+    name: String(entry.name || ''),
+    successRate: Number.isFinite(successRate) ? Math.max(0, Math.min(1, successRate)) : 0,
+    avgSuccessMs: Number.isFinite(avgRaw) && avgRaw > 0 ? avgRaw : null,
+    successCount: Number.isFinite(Number(entry.successCount)) ? Number(entry.successCount) : 0,
+    totalRounds: Number.isFinite(Number(entry.totalRounds)) ? Number(entry.totalRounds) : 0
+  };
+}
+
+function renderLeaderboard(entries) {
+  if (!leaderboardEls || !leaderboardEls.list) return;
+  leaderboardEls.list.innerHTML = '';
+  if (!entries.length) {
+    const empty = document.createElement('div');
+    empty.className = 'leaderboard-item';
+    empty.textContent = '暂无记录';
+    leaderboardEls.list.appendChild(empty);
+    return;
+  }
+
+  entries.forEach((rawEntry) => {
+    const entry = normalizeLeaderboardEntry(rawEntry);
+    const rateText = `${(entry.successRate * 100).toFixed(1)}%`;
+    const avgText = entry.avgSuccessMs === null ? '--' : `${entry.avgSuccessMs.toFixed(1)} ms`;
+    const item = document.createElement('div');
+    item.className = 'leaderboard-item';
+    item.textContent = `#${entry.rank} ${entry.name} | 成功率 ${rateText} | 平均成功时间 ${avgText}`;
+    leaderboardEls.list.appendChild(item);
+  });
+}
+
+async function fetchLeaderboard() {
+  const res = await fetch(`${BREAKBAR_API_URL}?limit=100`, { method: 'GET' });
+  if (!res.ok) throw new Error(`加载排行榜失败 (${res.status})`);
+  const data = await res.json();
+  return Array.isArray(data.entries) ? data.entries : [];
+}
+
+async function openLeaderboard() {
+  if (!leaderboardEls) return;
+  leaderboardEls.overlay.classList.remove('hidden');
+  leaderboardEls.overlay.setAttribute('aria-hidden', 'false');
+  try {
+    const entries = await fetchLeaderboard();
+    renderLeaderboard(entries);
+  } catch (e) {
+    renderLeaderboard([]);
+    message = e.message || '排行榜加载失败';
+  }
+}
+
+function closeLeaderboard() {
+  if (!leaderboardEls) return;
+  leaderboardEls.overlay.classList.add('hidden');
+  leaderboardEls.overlay.setAttribute('aria-hidden', 'true');
+}
+
+async function saveBatchSummary() {
+  if (!leaderboardEls) return;
+  if (!batchSummary) {
+    message = '请先完成4次连续测试。';
+    return;
+  }
+
+  const name = leaderboardEls.playerNameInput.value.trim();
+  if (!name) {
+    message = '请输入用户名后再保存。';
+    return;
+  }
+
+  const payload = {
+    name,
+    successRate: batchSummary.successRate,
+    avgSuccessMs: batchSummary.avgSuccessMs,
+    totalRounds: batchSummary.totalRounds,
+    successCount: batchSummary.successCount
+  };
+
+  const res = await fetch(BREAKBAR_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    throw new Error(`保存失败 (${res.status})`);
+  }
+  const data = await res.json();
+  renderLeaderboard(Array.isArray(data.entries) ? data.entries : []);
+  message = '成绩已保存到排行榜。';
+}
+
+function setupLeaderboardUI() {
+  const leaderboardBtn = document.getElementById('leaderboardBtn');
+  const overlay = document.getElementById('leaderboardOverlay');
+  const list = document.getElementById('leaderboardList');
+  const closeBtn = document.getElementById('closeLeaderboardBtn');
+  const saveBtn = document.getElementById('saveScoreBtn');
+  const clearBtn = document.getElementById('clearLeaderboardBtn');
+  const playerNameInput = document.getElementById('playerNameInput');
+  const currentTimeLabel = document.getElementById('currentTimeLabel');
+  if (!leaderboardBtn || !overlay || !list || !closeBtn || !saveBtn || !playerNameInput || !currentTimeLabel) return;
+
+  leaderboardBtn.textContent = '排行榜';
+  closeBtn.textContent = '关闭';
+  saveBtn.textContent = '保存记录';
+  if (clearBtn) {
+    clearBtn.style.display = 'none';
+  }
+
+  let batchTestBtn = document.getElementById('batchTestBtn');
+  if (!batchTestBtn) {
+    batchTestBtn = document.createElement('button');
+    batchTestBtn.id = 'batchTestBtn';
+    batchTestBtn.textContent = '4次连续测试';
+    batchTestBtn.style.cssText = `
+      position: fixed;
+      top: 52px;
+      right: 10px;
+      z-index: 20;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    `;
+    document.body.appendChild(batchTestBtn);
+  }
+
+  leaderboardEls = {
+    overlay,
+    list,
+    closeBtn,
+    saveBtn,
+    playerNameInput,
+    currentTimeLabel,
+    batchTestBtn
+  };
+
+  updateCurrentSummaryLabel();
+  updateBatchButtonState();
+
+  leaderboardBtn.addEventListener('click', () => {
+    openLeaderboard();
+  });
+  closeBtn.addEventListener('click', () => {
+    closeLeaderboard();
+  });
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeLeaderboard();
+  });
+  saveBtn.addEventListener('click', async () => {
+    try {
+      await saveBatchSummary();
+    } catch (e) {
+      message = e.message || '保存失败';
+    }
+  });
+  batchTestBtn.addEventListener('click', () => {
+    if (batchTestActive) return;
+    startBatchTest();
+  });
+}
 
 
 
@@ -395,6 +655,8 @@ function SystemUpdateRunning(now) {
         message = "自断就上钩？菜，就多练 \\(^o^)/~ 再来？";
       }
 
+      startResultImpact('awin', now);
+      onRoundFinished(false, null, now);
       state = "RESULT";
       reactionTime = null;
     }
@@ -408,6 +670,13 @@ function SystemUpdate() {
 
   if (bladeflycdEndTime !== null && now >= bladeflycdEndTime) {
     bladeflycdEndTime = null;
+  }
+
+  if (batchTestActive && batchNextRoundAt !== null && now >= batchNextRoundAt) {
+    batchNextRoundAt = null;
+    if (state === "RESULT" || state === "TOO_EARLY" || state === "IDLE") {
+      AStartPrepare(now);
+    }
   }
 
   if (state === "PREPARE") {
@@ -571,6 +840,58 @@ function drawCastBar() {
   }
 }
 
+function drawResultImpactEffect(now) {
+  if (!resultImpactType) return;
+
+  const duration = RESULT_IMPACT_DURATION[resultImpactType] || 0.7;
+  const elapsed = Math.max(0, now - resultImpactStartTime);
+  if (elapsed >= duration) {
+    resultImpactType = null;
+    return;
+  }
+
+  const progress = Math.min(1, elapsed / duration);
+  const pulse = 0.5 + 0.5 * Math.sin(elapsed * 18);
+  const baseFade = Math.max(0, 1 - progress);
+
+  let flashColor = '220, 60, 40';
+  let waveColor = '255, 220, 160';
+  let text = '剑冲命中';
+  if (resultImpactType === 'interrupt') {
+    flashColor = '160, 70, 220';
+    waveColor = '215, 190, 255';
+    text = '剑飞成功';
+  } else if (resultImpactType === 'awin') {
+    flashColor = '40, 180, 100';
+    waveColor = '180, 255, 215';
+    text = '读条完成';
+  }
+
+  const flashAlpha = Math.min(0.42, (0.12 + 0.2 * pulse) * baseFade + 0.05);
+  ctx.fillStyle = `rgba(${flashColor}, ${flashAlpha})`;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  const waveProgress = Math.min(1, progress * 1.25);
+  const maxRadius = Math.hypot(WIDTH, HEIGHT) * 0.58;
+  const radius = 24 + waveProgress * maxRadius;
+  const waveAlpha = Math.max(0, 0.75 * (1 - waveProgress));
+  ctx.beginPath();
+  ctx.arc(WIDTH * 0.5, HEIGHT * 0.5, radius, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(${waveColor}, ${waveAlpha})`;
+  ctx.lineWidth = 6;
+  ctx.stroke();
+
+  const hitScale = 1 + 0.05 * Math.sin(elapsed * 14);
+  const hitSize = Math.max(30, Math.floor(resultSize * 1.3 * hitScale));
+  ctx.font = `bold ${hitSize}px "Microsoft YaHei", Arial`;
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = 'rgba(30, 0, 0, 0.75)';
+  ctx.fillStyle = `rgba(255, 245, 210, ${Math.min(1, 0.7 + 0.3 * pulse) * baseFade + 0.1})`;
+  ctx.strokeText(text, WIDTH / 2, HEIGHT * 0.22);
+  ctx.fillText(text, WIDTH / 2, HEIGHT * 0.22);
+}
+
 function drawTexts() {
   ctx.font = titleFont;
   ctx.fillStyle = UI.textMain;
@@ -619,6 +940,9 @@ function draw() {
 
   // Cast bar
   drawCastBar();
+
+  // Result-specific VFX layer
+  drawResultImpactEffect(now);
 }
 // #endregion
 
@@ -631,6 +955,7 @@ function gameLoop() {
   requestAnimationFrame(gameLoop);
 }
 
+setupLeaderboardUI();
 gameLoop();
 // #endregion
 

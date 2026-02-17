@@ -34,6 +34,13 @@ let barFadeActive = false;
 let barFadeStartTime = 0;
 const BAR_FADE_DURATION = 0.4;
 let barHitFraction = 0.0;
+let resultImpactType = null;
+let resultImpactStartTime = 0;
+const RESULT_IMPACT_DURATION = {
+  timeout: 0.58,
+  interrupt: 0.72,
+  awin: 0.72
+};
 
 // 方案A：布局缓存
 let layoutDirty = true;
@@ -273,6 +280,11 @@ function AStartCasting(now) {
   currentBarSource = playSound('bar', false);
 }
 
+function startResultImpact(type, now) {
+  resultImpactType = type;
+  resultImpactStartTime = now;
+}
+
 function ACancelCasting() {
   reactionTime = barFraction * BAR_DURATION; // 被断时刻（用于显示）
   barFraction = 0.0;
@@ -283,6 +295,7 @@ function ACancelCasting() {
 function AFinishCasting() {
   barFraction = 1.0;
   message = `牛逼，你骗到 ${currentJob.name}了！点一下重开。`;
+  startResultImpact('awin', performance.now() / 1000);
   state = "RESULT";
   stopSound(currentBarSource);
   currentBarSource = null;
@@ -316,6 +329,7 @@ function BInterruptCasting(now, elapsed) {
   barAlpha = 1.0;
   barFadeActive = true;
   barFadeStartTime = now;
+  startResultImpact('interrupt', now);
 
   message = `想骗${currentJob.name}读条? ${currentJob.skillname.slice(0,2)}好了，重新再来吧~`;
   state = "RESULT";
@@ -617,6 +631,58 @@ function drawCastBar() {
   }
 }
 
+function drawResultImpactEffect(now) {
+  if (!resultImpactType) return;
+
+  const duration = RESULT_IMPACT_DURATION[resultImpactType] || 0.7;
+  const elapsed = Math.max(0, now - resultImpactStartTime);
+  if (elapsed >= duration) {
+    resultImpactType = null;
+    return;
+  }
+
+  const progress = Math.min(1, elapsed / duration);
+  const pulse = 0.5 + 0.5 * Math.sin(elapsed * 18);
+  const baseFade = Math.max(0, 1 - progress);
+
+  let flashColor = '220, 60, 40';
+  let waveColor = '255, 220, 160';
+  let text = '剑冲命中';
+  if (resultImpactType === 'interrupt') {
+    flashColor = '160, 70, 220';
+    waveColor = '215, 190, 255';
+    text = '剑飞成功';
+  } else if (resultImpactType === 'awin') {
+    flashColor = '40, 180, 100';
+    waveColor = '180, 255, 215';
+    text = '读条完成';
+  }
+
+  const flashAlpha = Math.min(0.42, (0.12 + 0.2 * pulse) * baseFade + 0.05);
+  ctx.fillStyle = `rgba(${flashColor}, ${flashAlpha})`;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  const waveProgress = Math.min(1, progress * 1.25);
+  const maxRadius = Math.hypot(WIDTH, HEIGHT) * 0.58;
+  const radius = 24 + waveProgress * maxRadius;
+  const waveAlpha = Math.max(0, 0.75 * (1 - waveProgress));
+  ctx.beginPath();
+  ctx.arc(WIDTH * 0.5, HEIGHT * 0.5, radius, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(${waveColor}, ${waveAlpha})`;
+  ctx.lineWidth = 6;
+  ctx.stroke();
+
+  const hitScale = 1 + 0.05 * Math.sin(elapsed * 14);
+  const hitSize = Math.max(30, Math.floor(resultSize * 1.3 * hitScale));
+  ctx.font = `bold ${hitSize}px "Microsoft YaHei", Arial`;
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = 'rgba(30, 0, 0, 0.75)';
+  ctx.fillStyle = `rgba(255, 245, 210, ${Math.min(1, 0.7 + 0.3 * pulse) * baseFade + 0.1})`;
+  ctx.strokeText(text, WIDTH / 2, HEIGHT * 0.22);
+  ctx.fillText(text, WIDTH / 2, HEIGHT * 0.22);
+}
+
 function drawTexts() {
   ctx.font = titleFont;
   ctx.fillStyle = UI.textMain;
@@ -676,6 +742,9 @@ function draw() {
 
   // Cast bar
   drawCastBar();
+
+  // Result-specific VFX layer
+  drawResultImpactEffect(now);
 }
 // #endregion
 
