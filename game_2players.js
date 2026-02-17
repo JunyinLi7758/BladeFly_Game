@@ -181,20 +181,35 @@ let message = '双人对战模式';
 // let ROOM_ID = (new URLSearchParams(location.search)).get('room') || 'default';
 
 // =========================
-// ROOM_ID：从 JS 里获取（不依赖 TwoPlayers.html / URL）
-// 你只需要改这里就能设定默认房间号
+// ROOM_ID：支持 URL 参数 + 本地保存 + JS 默认
+// URL 参数示例：?room=abc 或 ?r=abc
 // =========================
 const ROOM_ID_JS_DEFAULT = 'default'; // ← 改成你想要的默认 roomId，比如 'room_001'
 
+function getRoomIdFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get('room') || params.get('r');
+    return v && v.trim() ? v.trim() : '';
+  } catch (e) {
+    return '';
+  }
+}
+
 function getInitialRoomId() {
-  // 优先用本地保存的上次房间号
+  // 1) 优先使用 URL 参数
+  const fromUrl = getRoomIdFromUrl();
+  if (fromUrl) return fromUrl;
+
+  // 2) 其次使用本地保存的上次房间号
   const saved = localStorage.getItem('roomId');
   if (saved && saved.trim()) return saved.trim();
 
-  // 否则用 JS 内置默认值
+  // 3) 否则用 JS 内置默认值
   return ROOM_ID_JS_DEFAULT;
 }
 
+const ROOM_ID_FROM_URL = Boolean(getRoomIdFromUrl());
 let ROOM_ID = getInitialRoomId();
 
 const WS_URL = `ws://${location.hostname}:8080`;
@@ -208,6 +223,7 @@ let btnJoinRoomEl = null;
 let btnLeaveRoomEl = null;
 let btnSwapRoleEl = null;
 let btnResetScoreEl = null;
+let btnShareRoomEl = null;
 let btnMinRoomPanelEl = null;
 let preJoinEl = null;
 let inRoomEl = null;
@@ -863,6 +879,10 @@ function updateRoomPanels() {
       btnResetScoreEl.disabled = !canResetScore;
       btnResetScoreEl.textContent = '清零战绩';
     }
+    if (btnShareRoomEl) {
+      btnShareRoomEl.disabled = false;
+      btnShareRoomEl.textContent = '分享房间';
+    }
     return;
   }
   preJoinEl.style.display = 'flex';
@@ -877,6 +897,10 @@ function updateRoomPanels() {
     btnResetScoreEl.disabled = true;
     btnResetScoreEl.textContent = '清零战绩';
   }
+  if (btnShareRoomEl) {
+    btnShareRoomEl.disabled = true;
+    btnShareRoomEl.textContent = '分享房间';
+  }
 }
 
 function applyRoomPanelCollapsed(collapsed) {
@@ -885,6 +909,44 @@ function applyRoomPanelCollapsed(collapsed) {
   if (btnMinRoomPanelEl) {
     btnMinRoomPanelEl.textContent = collapsed ? '+' : '-';
     btnMinRoomPanelEl.title = collapsed ? '展开' : '最小化';
+  }
+}
+
+function buildRoomShareUrl(roomId) {
+  const safeRoomId = roomId && roomId.trim() ? roomId.trim() : 'default';
+  const shareUrl = new URL(window.location.href);
+  shareUrl.pathname = shareUrl.pathname.replace(/[^/]*$/, 'TwoPlayers.html');
+  shareUrl.search = '';
+  shareUrl.hash = '';
+  shareUrl.searchParams.set('room', safeRoomId);
+  return shareUrl.toString();
+}
+
+async function copyTextToClipboard(text) {
+  if (!text) return false;
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (e) {
+    // Fallback below.
+  }
+
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    ta.style.pointerEvents = 'none';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch (e) {
+    return false;
   }
 }
 
@@ -979,6 +1041,13 @@ window.addEventListener('DOMContentLoaded', () => {
     padding: 6px 10px; border-radius: 8px; border: 0;
     background: rgba(190,130,40,0.9); color: #fff; cursor: pointer;
   `;
+  const btnShareRoom = document.createElement('button');
+  btnShareRoom.id = 'btnShareRoom';
+  btnShareRoom.textContent = '分享房间';
+  btnShareRoom.style.cssText = `
+    padding: 6px 10px; border-radius: 8px; border: 0;
+    background: rgba(80,160,95,0.9); color: #fff; cursor: pointer;
+  `;
   const btnLeave = document.createElement('button');
   btnLeave.id = 'btnLeaveRoom';
   btnLeave.textContent = '退出房间';
@@ -988,6 +1057,7 @@ window.addEventListener('DOMContentLoaded', () => {
   `;
   actions.appendChild(btnSwap);
   actions.appendChild(btnResetScore);
+  actions.appendChild(btnShareRoom);
   actions.appendChild(btnLeave);
 
   inRoom.appendChild(header);
@@ -1008,6 +1078,7 @@ window.addEventListener('DOMContentLoaded', () => {
   btnLeaveRoomEl = document.getElementById('btnLeaveRoom');
   btnSwapRoleEl = document.getElementById('btnSwapRole');
   btnResetScoreEl = document.getElementById('btnResetScore');
+  btnShareRoomEl = document.getElementById('btnShareRoom');
   btnMinRoomPanelEl = document.getElementById('btnMinRoomPanel');
   preJoinEl = document.getElementById('preJoinRules');
   inRoomEl = document.getElementById('inRoomBanner');
@@ -1066,6 +1137,22 @@ window.addEventListener('DOMContentLoaded', () => {
       resetScoreBtnInBanner = btn;
     }
     btnResetScoreEl = resetScoreBtnInBanner;
+    let shareRoomBtnInBanner = inRoomEl.querySelector('#btnShareRoom');
+    if (!shareRoomBtnInBanner) {
+      let actions = inRoomEl.querySelector('.room-actions');
+      if (!actions) {
+        actions = document.createElement('div');
+        actions.className = 'room-actions';
+        inRoomEl.appendChild(actions);
+      }
+      const btn = document.createElement('button');
+      btn.id = 'btnShareRoom';
+      btn.className = 'job-btn room-share-btn';
+      btn.textContent = '分享房间';
+      actions.insertBefore(btn, btnLeaveRoomEl || null);
+      shareRoomBtnInBanner = btn;
+    }
+    btnShareRoomEl = shareRoomBtnInBanner;
     roomIdLabelEl = inRoomEl.querySelector('#roomIdLabel') || roomIdLabelEl;
     roleValueEl = inRoomEl.querySelector('#roleValue') || roleValueEl;
     if (!btnMinRoomPanelEl) {
@@ -1095,6 +1182,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // 初始化房间输入值
   if (roomInputEl) roomInputEl.value = ROOM_ID || 'default';
+  if (ROOM_ID_FROM_URL && ROOM_ID) {
+    localStorage.setItem('roomId', ROOM_ID);
+  }
   function joinRoomById(id) {
     const newRoom = id && id.trim() ? id.trim() : 'default';
     // If already connected, close previous connection first
@@ -1174,6 +1264,19 @@ window.addEventListener('DOMContentLoaded', () => {
       updateRoomPanels();
     });
   }
+  if (btnShareRoomEl) {
+    btnShareRoomEl.addEventListener('click', async () => {
+      suppressGlobalInputBriefly();
+      const shareUrl = buildRoomShareUrl(ROOM_ID);
+      const copied = await copyTextToClipboard(shareUrl);
+      if (copied) {
+        message = '房间链接已复制，可直接发送给好友。';
+      } else {
+        message = `复制失败，请手动复制：${shareUrl}`;
+      }
+      updateRoomPanels();
+    });
+  }
   if (btnMinRoomPanelEl) {
     btnMinRoomPanelEl.addEventListener('click', () => {
       suppressGlobalInputBriefly();
@@ -1183,8 +1286,8 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 若通过 URL 指定房间，则自动加入
-  if (ROOM_ID && ROOM_ID !== 'default') {
+  // 若通过 URL 指定房间，或已有非 default 的房间号，则自动加入
+  if ((ROOM_ID_FROM_URL && ROOM_ID) || (ROOM_ID && ROOM_ID !== 'default')) {
     connectWS();
   }
 
