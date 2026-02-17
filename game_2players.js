@@ -238,7 +238,7 @@ let aCancelUntil = null;
 // Casting
 const CAST_DURATION = 0.63;
 let barFraction = 0.0;
-const DEFAULT_ROUND_TIMEOUT_SECONDS = 3.0;
+const DEFAULT_ROUND_TIMEOUT_SECONDS = 4.0;
 let roundTimeoutSeconds = DEFAULT_ROUND_TIMEOUT_SECONDS;
 let roundStartTime = null;
 let lastInterruptElapsedMs = null;
