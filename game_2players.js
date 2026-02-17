@@ -33,8 +33,15 @@ let barFadeActive = false;
 let barFadeStartTime = 0;
 const BAR_FADE_DURATION = 0.4;
 let barHitFraction = 0.0;
-let timeoutImpactActive = false;
-let timeoutImpactStartTime = 0;
+let resultImpactType = null;
+let resultImpactStartTime = 0;
+let lastResultImpactState = null;
+let lastResultImpactReason = null;
+const RESULT_IMPACT_DURATION = {
+  timeout: 0.58,
+  interrupt: 0.72,
+  awin: 0.72
+};
 
 // 方案A：布局缓存
 let layoutDirty = true;
@@ -1522,51 +1529,76 @@ function drawCastBar() {
   }
 }
 
-function updateTimeoutImpactState(now) {
-  const shouldShow = systemState === SystemState.BWIN && bWinReason === BWinReason.TIMEOUT;
-  if (shouldShow) {
-    if (!timeoutImpactActive) {
-      timeoutImpactActive = true;
-      timeoutImpactStartTime = now;
-    }
-    return;
-  }
-  timeoutImpactActive = false;
+function startResultImpact(type, now) {
+  resultImpactType = type;
+  resultImpactStartTime = now;
 }
 
-function drawTimeoutImpactEffect(now) {
-  if (!timeoutImpactActive) return;
+function updateResultImpactState(now) {
+  if (systemState !== lastResultImpactState || bWinReason !== lastResultImpactReason) {
+    if (systemState === SystemState.BWIN && bWinReason === BWinReason.TIMEOUT) {
+      startResultImpact('timeout', now);
+    } else if (systemState === SystemState.BWIN && bWinReason === BWinReason.INTERRUPT) {
+      startResultImpact('interrupt', now);
+    } else if (systemState === SystemState.AWIN) {
+      startResultImpact('awin', now);
+    }
+    lastResultImpactState = systemState;
+    lastResultImpactReason = bWinReason;
+  }
 
-  const elapsed = Math.max(0, now - timeoutImpactStartTime);
-  const pulse = 0.5 + 0.5 * Math.sin(elapsed * 16);
-  const decay = Math.exp(-elapsed * 1.6);
+  if (!resultImpactType) return;
+  const duration = RESULT_IMPACT_DURATION[resultImpactType] || 0.7;
+  if (now - resultImpactStartTime >= duration) {
+    resultImpactType = null;
+  }
+}
 
-  // 红橙色冲击闪屏
-  const flashAlpha = Math.min(0.42, 0.16 + 0.2 * decay + 0.08 * pulse);
-  ctx.fillStyle = `rgba(220, 60, 40, ${flashAlpha})`;
+function drawResultImpactEffect(now) {
+  if (!resultImpactType) return;
+
+  const duration = RESULT_IMPACT_DURATION[resultImpactType] || 0.7;
+  const elapsed = Math.max(0, now - resultImpactStartTime);
+  const progress = Math.min(1, elapsed / duration);
+  const pulse = 0.5 + 0.5 * Math.sin(elapsed * 18);
+  const baseFade = Math.max(0, 1 - progress);
+
+  let flashColor = '220, 60, 40';
+  let waveColor = '255, 220, 160';
+  let text = '剑冲命中';
+  if (resultImpactType === 'interrupt') {
+    flashColor = '160, 70, 220';
+    waveColor = '215, 190, 255';
+    text = '剑飞成功';
+  } else if (resultImpactType === 'awin') {
+    flashColor = '40, 180, 100';
+    waveColor = '180, 255, 215';
+    text = '读条完成';
+  }
+
+  const flashAlpha = Math.min(0.42, (0.12 + 0.2 * pulse) * baseFade + 0.05);
+  ctx.fillStyle = `rgba(${flashColor}, ${flashAlpha})`;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  // 中心冲击波
-  const waveProgress = Math.min(1, elapsed / 0.8);
-  const maxRadius = Math.hypot(WIDTH, HEIGHT) * 0.6;
+  const waveProgress = Math.min(1, progress * 1.25);
+  const maxRadius = Math.hypot(WIDTH, HEIGHT) * 0.58;
   const radius = 24 + waveProgress * maxRadius;
-  const waveAlpha = Math.max(0, 0.7 * (1 - waveProgress));
+  const waveAlpha = Math.max(0, 0.75 * (1 - waveProgress));
   ctx.beginPath();
   ctx.arc(WIDTH * 0.5, HEIGHT * 0.5, radius, 0, Math.PI * 2);
-  ctx.strokeStyle = `rgba(255, 220, 160, ${waveAlpha})`;
+  ctx.strokeStyle = `rgba(${waveColor}, ${waveAlpha})`;
   ctx.lineWidth = 6;
   ctx.stroke();
 
-  // 额外命中提示
   const hitScale = 1 + 0.05 * Math.sin(elapsed * 14);
-  const hitSize = Math.max(32, Math.floor(resultSize * 1.35 * hitScale));
+  const hitSize = Math.max(30, Math.floor(resultSize * 1.3 * hitScale));
   ctx.font = `bold ${hitSize}px "Microsoft YaHei", Arial`;
   ctx.textAlign = 'center';
   ctx.lineWidth = 5;
   ctx.strokeStyle = 'rgba(30, 0, 0, 0.75)';
-  ctx.fillStyle = `rgba(255, 235, 180, ${Math.min(1, 0.7 + 0.3 * pulse)})`;
-  ctx.strokeText('剑冲命中', WIDTH / 2, HEIGHT * 0.22 + uiShiftY);
-  ctx.fillText('剑冲命中', WIDTH / 2, HEIGHT * 0.22 + uiShiftY);
+  ctx.fillStyle = `rgba(255, 245, 210, ${Math.min(1, 0.7 + 0.3 * pulse) * baseFade + 0.1})`;
+  ctx.strokeText(text, WIDTH / 2, HEIGHT * 0.22 + uiShiftY);
+  ctx.fillText(text, WIDTH / 2, HEIGHT * 0.22 + uiShiftY);
 }
 
 function drawTexts() {
@@ -1673,7 +1705,7 @@ function draw() {
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
   const now = performance.now() / 1000;
-  updateTimeoutImpactState(now);
+  updateResultImpactState(now);
 
   // Logo
   drawLogo();
@@ -1690,8 +1722,8 @@ function draw() {
   // Cast bar
   drawCastBar();
 
-  // Timeout-specific VFX layer (剑冲命中)
-  drawTimeoutImpactEffect(now);
+  // Result-specific VFX layer (剑冲命中 / 剑飞成功 / 读条完成)
+  drawResultImpactEffect(now);
 }
 // #endregion
 
