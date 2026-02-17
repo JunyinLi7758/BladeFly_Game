@@ -241,6 +241,7 @@ let barFraction = 0.0;
 const DEFAULT_ROUND_TIMEOUT_SECONDS = 3.0;
 let roundTimeoutSeconds = DEFAULT_ROUND_TIMEOUT_SECONDS;
 let roundStartTime = null;
+let lastInterruptElapsedMs = null;
 
 // A/B ready flags
 let aReady = false;
@@ -403,6 +404,9 @@ function BInterrupt(now) {
     return;
   }
 
+  if (roundStartTime !== null) {
+    lastInterruptElapsedMs = Math.max(0, (now - roundStartTime) * 1000);
+  }
   if (systemState === SystemState.RUNNING && aState === AState.CASTING) {
     systemState = SystemState.BWIN;
     bWinReason = BWinReason.INTERRUPT;
@@ -430,6 +434,7 @@ function maybeEnterPrepare(now) {
     prepareStartTime = now;
     roundStartTime = null;
     bWinReason = null;
+    lastInterruptElapsedMs = null;
   }
 }
 
@@ -443,6 +448,7 @@ function updatePrepare(now) {
     roundStartTime = now;
     startTime = null;
     barFraction = 0.0;
+    lastInterruptElapsedMs = null;
     resetBarVisuals();
   }
   AUpdateStrategyRandom();
@@ -618,6 +624,7 @@ function connectWS() {
       resetScoreboardLocal();
       roundStartTime = null;
       bWinReason = null;
+      lastInterruptElapsedMs = null;
       barFraction = 0.0;
       resetBarVisuals();
       updateRoomPanels();
@@ -660,6 +667,14 @@ function connectWS() {
       bWins = Number.isFinite(Number(msg.bWins)) ? Number(msg.bWins) : bWins;
       barFraction = msg.barFraction;
       bWinReason = msg.bWinReason || null;
+      if (msg.lastInterruptElapsedMs === null || msg.lastInterruptElapsedMs === undefined) {
+        lastInterruptElapsedMs = null;
+      } else {
+        const parsedLastInterruptMs = Number(msg.lastInterruptElapsedMs);
+        lastInterruptElapsedMs = Number.isFinite(parsedLastInterruptMs)
+          ? Math.max(0, parsedLastInterruptMs)
+          : null;
+      }
         // Prefer server-provided remaining seconds to avoid clock skew on mobile
         bCdRemaining = 0;
         if (msg.bCdRemaining !== undefined && msg.bCdRemaining !== null) {
@@ -685,16 +700,19 @@ function connectWS() {
         if (systemState === SystemState.RUNNING) {
           roundStartTime = performance.now() / 1000;
           bWinReason = null;
+          lastInterruptElapsedMs = null;
           resetBarVisuals();
         }
         if (systemState === SystemState.PREPARE) {
           roundStartTime = null;
           bWinReason = null;
+          lastInterruptElapsedMs = null;
           prepareStartTime = performance.now() / 1000;
         }
         if (systemState === SystemState.IDLE) {
           roundStartTime = null;
           bWinReason = null;
+          lastInterruptElapsedMs = null;
           barFraction = 0.0;
           resetBarVisuals();
           if (wsRole === 'A') {
@@ -751,6 +769,7 @@ function connectWS() {
     roomHasA = false;
     roomHasB = false;
     resetScoreboardLocal();
+    lastInterruptElapsedMs = null;
     if (pingIntervalId) { clearInterval(pingIntervalId); pingIntervalId = null; }
     updateRoomPanels();
   });
@@ -1221,6 +1240,7 @@ window.addEventListener('DOMContentLoaded', () => {
     resetScoreboardLocal();
     roundStartTime = null;
     bWinReason = null;
+    lastInterruptElapsedMs = null;
     barFraction = 0.0;
     resetBarVisuals();
     stopAllSounds();
@@ -1519,13 +1539,20 @@ function drawTexts() {
   }
 
   let text;
+  const interruptMsText = (lastInterruptElapsedMs !== null)
+    ? lastInterruptElapsedMs.toFixed(2)
+    : null;
   if (systemState === SystemState.AWIN) {
-    text = '读完咯！';
+    if (interruptMsText !== null) {
+      text = `剑纯${interruptMsText}ms（剑飞时间）没有飞到`;
+    } else {
+      text = '读完咯！';
+    }
   } else if (systemState === SystemState.BWIN) {
     if (bWinReason === BWinReason.TIMEOUT) {
-      text = '免控结束啦，你被剑冲了';
+      text = '骗也没用 还不是要吃剑冲';
     } else {
-      text = '被飞到咯！';
+      text = interruptMsText !== null ? `剑飞成功时间 ${interruptMsText}ms` : '剑飞成功';
     }
   } else if (systemState === SystemState.PREPARE) {
     let remaining = 3;
