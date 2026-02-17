@@ -1544,15 +1544,15 @@ function drawTexts() {
     : null;
   if (systemState === SystemState.AWIN) {
     if (interruptMsText !== null) {
-      text = `剑纯${interruptMsText}ms（剑飞时间）没有飞到`;
+      text = `就算你${interruptMsText}ms的剑飞，也没用~ `;
     } else {
-      text = '读完咯！';
+      text = '这都飞不到？小剑纯！ 还得练~ ';
     }
   } else if (systemState === SystemState.BWIN) {
     if (bWinReason === BWinReason.TIMEOUT) {
       text = '骗也没用 还不是要吃剑冲';
     } else {
-      text = interruptMsText !== null ? `剑飞成功时间 ${interruptMsText}ms` : '剑飞成功';
+      text = interruptMsText !== null ? `哥们 ${interruptMsText}ms` : '的剑飞，别想逃！';
     }
   } else if (systemState === SystemState.PREPARE) {
     let remaining = 3;
