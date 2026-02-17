@@ -60,6 +60,7 @@ function createRoom(roomId) {
     barFraction: 0.0,
     bCdEndTime: null,
     bWinReason: null,
+    lastInterruptElapsedMs: null,
     swapConfirmA: false,
     swapConfirmB: false,
     aWins: 0,
@@ -112,6 +113,7 @@ function resetRoomState(room, options = {}) {
   room.barFraction = 0.0;
   room.bCdEndTime = null;
   room.bWinReason = null;
+  room.lastInterruptElapsedMs = null;
   room.swapConfirmA = false;
   room.swapConfirmB = false;
   if (resetScore) {
@@ -157,6 +159,7 @@ function updateRoom(room) {
     room.prepareStartTime = now;
     room.roundStartTime = null;
     room.bWinReason = null;
+    room.lastInterruptElapsedMs = null;
   }
 
   // 准备状态 ==> 运行状态
@@ -170,6 +173,7 @@ function updateRoom(room) {
     room.startTime = null;
     room.barFraction = 0.0;
     room.bWinReason = null;
+    room.lastInterruptElapsedMs = null;
   }
 
   // 运行状态超时：开局超过5秒，判定B获胜
@@ -250,6 +254,9 @@ function handleInput(room, role, action) {
   // B玩家使用打断
   if (action === 'interrupt' && role === 'B') {
     if (room.bCdEndTime !== null && now < room.bCdEndTime) return;
+    if (room.systemState === SystemState.RUNNING && room.roundStartTime !== null) {
+      room.lastInterruptElapsedMs = Math.max(0, (now - room.roundStartTime) * 1000);
+    }
     if (room.systemState === SystemState.RUNNING && room.aState === AState.CASTING) {
       room.systemState = SystemState.BWIN;
       room.aReady = false;
@@ -347,6 +354,7 @@ setInterval(() => {
       bCdEndTime: room.bCdEndTime,
       bCdRemaining: room.bCdEndTime !== null ? Math.max(0, room.bCdEndTime - nowSec()) : 0,
       bWinReason: room.bWinReason,
+      lastInterruptElapsedMs: room.lastInterruptElapsedMs,
       swapConfirmA: room.swapConfirmA,
       swapConfirmB: room.swapConfirmB,
       aWins: room.aWins,
