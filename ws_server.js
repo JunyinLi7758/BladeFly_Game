@@ -13,7 +13,7 @@ const ROUND_TIMEOUT_SECONDS = Number.isFinite(Number(gameRules.roundTimeoutSecon
   ? Number(gameRules.roundTimeoutSeconds)
   : 3.0;
 
-// 系统状态
+// 系统状�?
 const SystemState = {
   IDLE: 'IDLE',
   PREPARE: 'PREPARE',
@@ -22,13 +22,13 @@ const SystemState = {
   BWIN: 'BWIN'
 };
 
-// A玩家状态
+// A玩家状�?
 const AState = {
   NO_CASTING: 'NO_CASTING',
   CASTING: 'CASTING'
 };
 
-// B玩家状态
+// B玩家状�?
 const BState = {
   NO_CD: 'NO_CD',
   IN_CD: 'IN_CD'
@@ -39,12 +39,12 @@ const BWinReason = {
   TIMEOUT: 'TIMEOUT'
 };
 
-// 获取当前时间（秒）
+// 获取当前时间（秒�?
 function nowSec() {
   return Date.now() / 1000;
 }
 
-// 创建新房间
+// 创建新房�?
 function createRoom(roomId) {
   return {
     roomId,
@@ -70,7 +70,7 @@ function createRoom(roomId) {
 
 const rooms = new Map();
 
-// 获取或创建房间
+// 获取或创建房�?
 function getRoom(roomId) {
   if (!rooms.has(roomId)) rooms.set(roomId, createRoom(roomId));
   return rooms.get(roomId);
@@ -99,7 +99,7 @@ function getRolePresence(room) {
   return { hasA, hasB };
 }
 
-// 重置房间状态
+// 重置房间状�?
 function resetRoomState(room, options = {}) {
   const resetScore = Boolean(options.resetScore);
   room.systemState = SystemState.IDLE;
@@ -132,7 +132,7 @@ function swapRoles(room) {
   }
 }
 
-// 向房间内所有客户端广播状态
+// 向房间内所有客户端广播状�?
 function broadcast(room, payload) {
   const msg = JSON.stringify(payload);
   for (const ws of room.clients.keys()) {
@@ -144,13 +144,13 @@ function broadcast(room, payload) {
 function updateRoom(room) {
   const now = nowSec();
 
-  // 检测B的冷却时间是否结束
+  // 检测B的冷却时间是否结�?
   if (room.bCdEndTime !== null && now >= room.bCdEndTime) {
     room.bCdEndTime = null;
     room.bState = BState.NO_CD;
   }
 
-  // 初始/结束状态 ==> 准备状态
+  // 初始/结束状�?==> 准备状�?
   if ((room.systemState === SystemState.IDLE ||
        room.systemState === SystemState.AWIN ||
        room.systemState === SystemState.BWIN) &&
@@ -162,7 +162,7 @@ function updateRoom(room) {
     room.lastInterruptElapsedMs = null;
   }
 
-  // 准备状态 ==> 运行状态
+  // 准备状�?==> 运行状�?
   if (room.systemState === SystemState.PREPARE &&
       room.prepareStartTime !== null &&
       now - room.prepareStartTime >= PREPARE_SECONDS) {
@@ -190,7 +190,7 @@ function updateRoom(room) {
     room.bWins += 1;
   }
 
-  // 运行状态下A的施法进度更新
+  // 运行状态下A的施法进度更�?
   if (room.systemState === SystemState.RUNNING && room.aState === AState.CASTING) {
     const elapsed = now - room.startTime;
     room.barFraction = elapsed / CAST_DURATION;
@@ -205,7 +205,7 @@ function updateRoom(room) {
   }
 }
 
-// 处理客户端输入
+// 处理客户端输�?
 function handleInput(room, role, action) {
   const now = nowSec();
   // A、B玩家准备就绪
@@ -215,7 +215,7 @@ function handleInput(room, role, action) {
     return;
   }
 
-  // 双方确认后交换角色
+  // 双方确认后交换角�?
   if (action === 'swap_confirm') {
     if (role === 'A') room.swapConfirmA = true;
     if (role === 'B') room.swapConfirmB = true;
@@ -234,7 +234,7 @@ function handleInput(room, role, action) {
     return;
   }
 
-  // A玩家开始读条
+  // A玩家开始读�?
   if (action === 'start_cast' && role === 'A') {
     if (room.systemState !== SystemState.RUNNING) return;
     room.aState = AState.CASTING;
@@ -254,8 +254,8 @@ function handleInput(room, role, action) {
   // B玩家使用打断
   if (action === 'interrupt' && role === 'B') {
     if (room.bCdEndTime !== null && now < room.bCdEndTime) return;
-    if (room.systemState === SystemState.RUNNING && room.roundStartTime !== null) {
-      room.lastInterruptElapsedMs = Math.max(0, (now - room.roundStartTime) * 1000);
+    if (room.systemState === SystemState.RUNNING && room.startTime !== null) {
+      room.lastInterruptElapsedMs = Math.max(0, (now - room.startTime) * 1000);
     }
     if (room.systemState === SystemState.RUNNING && room.aState === AState.CASTING) {
       room.systemState = SystemState.BWIN;
@@ -286,7 +286,7 @@ wss.on('connection', (ws) => {
     return info ? info.role : null;
   }
 
-  // 处理客户端消息
+  // 处理客户端消�?
   ws.on('message', (data) => {
     let msg = null;
     try { msg = JSON.parse(data.toString()); } catch (e) { return; }
@@ -338,7 +338,7 @@ wss.on('connection', (ws) => {
 
 
 // 定时更新房间状态并广播
-// 广播信息： {type:'state', systemState, aState, bState, aReady, bReady, barFraction, bCdEndTime, bCdRemaining}
+// 广播信息�?{type:'state', systemState, aState, bState, aReady, bReady, barFraction, bCdEndTime, bCdRemaining}
 setInterval(() => {
   for (const room of rooms.values()) {
     updateRoom(room);
@@ -368,3 +368,4 @@ setInterval(() => {
 server.listen(PORT, () => {
   console.log(`WS server running on :${PORT}`);
 });
+
