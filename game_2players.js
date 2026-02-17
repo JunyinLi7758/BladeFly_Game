@@ -795,9 +795,7 @@ function isUiControlTarget(target) {
 function setupCanvasInput() {
   if (!canvas) return;
 
-  const LONG_MS = 250;
-  let longPressTimer = null;
-  let longPressFired = false;
+  let startedCastingByPress = false;
   let audioUnlocked = false;
   let pressFromCanvas = false;
 
@@ -812,15 +810,22 @@ function setupCanvasInput() {
     if (e.cancelable) e.preventDefault();
     pressFromCanvas = true;
     ensureAudioUnlocked();
-    longPressFired = false;
-    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
-    longPressTimer = setTimeout(() => {
-      longPressFired = true;
-      const now = performance.now() / 1000;
+
+    const now = performance.now() / 1000;
+    startedCastingByPress = false;
+
+    // 无阈值长按：A 在 RUNNING 下按下即开始读条，松开即取消
+    if (wsConnected) {
+      if (wsRole === 'A' && !aComMode && systemState === SystemState.RUNNING) {
+        recentLongPress = now;
+        AStartCasting(now);
+        startedCastingByPress = true;
+      }
+    } else if (systemState === SystemState.RUNNING) {
       recentLongPress = now;
-      // 只有 A 发起读条（服务器会忽略无效角色）
       AStartCasting(now);
-    }, LONG_MS);
+      startedCastingByPress = true;
+    }
   }
 
   function endPress(e) {
@@ -828,12 +833,11 @@ function setupCanvasInput() {
     pressFromCanvas = false;
     if (e && e.cancelable) e.preventDefault();
     const now = performance.now() / 1000;
-    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
-    if (longPressFired) {
+    if (startedCastingByPress) {
       // 长按后松开 -> 取消读条
       recentLongPress = now;
       ACancelCasting(now);
-      longPressFired = false;
+      startedCastingByPress = false;
     } else {
       // 短按：如果是 B 则触发打断；否则视为准备（单击准备）
       if (wsConnected) {
@@ -858,9 +862,13 @@ function setupCanvasInput() {
   canvas.addEventListener('mousedown', startPress);
   window.addEventListener('mouseup', endPress);
   window.addEventListener('blur', () => {
+    const now = performance.now() / 1000;
+    if (startedCastingByPress) {
+      recentLongPress = now;
+      ACancelCasting(now);
+    }
     pressFromCanvas = false;
-    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
-    longPressFired = false;
+    startedCastingByPress = false;
   });
 
   // 触摸
