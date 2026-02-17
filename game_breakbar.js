@@ -388,6 +388,11 @@ function onRoundFinished(success, timeMs, now) {
     message = `测试完成：${formatBatchSummary(batchSummary)}。可输入用户名保存。`;
     updateCurrentSummaryLabel();
     updateBatchButtonState();
+    openLeaderboard().then(() => {
+      if (leaderboardEls && leaderboardEls.playerNameInput) {
+        leaderboardEls.playerNameInput.focus();
+      }
+    }).catch(() => {});
     return;
   }
 
