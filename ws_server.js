@@ -1,4 +1,4 @@
-// ws_server.js
+﻿// ws_server.js
 // Minimal WS server for 2P state sync.
 const http = require('http');
 const WebSocket = require('ws');
@@ -13,7 +13,7 @@ const ROUND_TIMEOUT_SECONDS = Number.isFinite(Number(gameRules.roundTimeoutSecon
   ? Number(gameRules.roundTimeoutSeconds)
   : 3.0;
 
-// 系统状�?
+// 绯荤粺鐘舵€?
 const SystemState = {
   IDLE: 'IDLE',
   PREPARE: 'PREPARE',
@@ -22,13 +22,13 @@ const SystemState = {
   BWIN: 'BWIN'
 };
 
-// A玩家状�?
+// A鐜╁鐘舵€?
 const AState = {
   NO_CASTING: 'NO_CASTING',
   CASTING: 'CASTING'
 };
 
-// B玩家状�?
+// B鐜╁鐘舵€?
 const BState = {
   NO_CD: 'NO_CD',
   IN_CD: 'IN_CD'
@@ -39,12 +39,12 @@ const BWinReason = {
   TIMEOUT: 'TIMEOUT'
 };
 
-// 获取当前时间（秒�?
+// 鑾峰彇褰撳墠鏃堕棿锛堢锛?
 function nowSec() {
   return Date.now() / 1000;
 }
 
-// 创建新房�?
+// 鍒涘缓鏂版埧闂?
 function createRoom(roomId) {
   return {
     roomId,
@@ -70,13 +70,13 @@ function createRoom(roomId) {
 
 const rooms = new Map();
 
-// 获取或创建房�?
+// 鑾峰彇鎴栧垱寤烘埧闂?
 function getRoom(roomId) {
   if (!rooms.has(roomId)) rooms.set(roomId, createRoom(roomId));
   return rooms.get(roomId);
 }
 
-// 分配房间内角色A、B或S
+// 鍒嗛厤鎴块棿鍐呰鑹睞銆丅鎴朣
 function assignRole(room) {
   let hasA = false;
   let hasB = false;
@@ -99,7 +99,7 @@ function getRolePresence(room) {
   return { hasA, hasB };
 }
 
-// 重置房间状�?
+// 閲嶇疆鎴块棿鐘舵€?
 function resetRoomState(room, options = {}) {
   const resetScore = Boolean(options.resetScore);
   room.systemState = SystemState.IDLE;
@@ -132,7 +132,7 @@ function swapRoles(room) {
   }
 }
 
-// 向房间内所有客户端广播状�?
+// 鍚戞埧闂村唴鎵€鏈夊鎴风骞挎挱鐘舵€?
 function broadcast(room, payload) {
   const msg = JSON.stringify(payload);
   for (const ws of room.clients.keys()) {
@@ -140,17 +140,17 @@ function broadcast(room, payload) {
   }
 }
 
-// 更新房间状态机
+// 鏇存柊鎴块棿鐘舵€佹満
 function updateRoom(room) {
   const now = nowSec();
 
-  // 检测B的冷却时间是否结�?
+  // 妫€娴婤鐨勫喎鍗存椂闂存槸鍚︾粨鏉?
   if (room.bCdEndTime !== null && now >= room.bCdEndTime) {
     room.bCdEndTime = null;
     room.bState = BState.NO_CD;
   }
 
-  // 初始/结束状�?==> 准备状�?
+  // 鍒濆/缁撴潫鐘舵€?==> 鍑嗗鐘舵€?
   if ((room.systemState === SystemState.IDLE ||
        room.systemState === SystemState.AWIN ||
        room.systemState === SystemState.BWIN) &&
@@ -162,7 +162,7 @@ function updateRoom(room) {
     room.lastInterruptElapsedMs = null;
   }
 
-  // 准备状�?==> 运行状�?
+  // 鍑嗗鐘舵€?==> 杩愯鐘舵€?
   if (room.systemState === SystemState.PREPARE &&
       room.prepareStartTime !== null &&
       now - room.prepareStartTime >= PREPARE_SECONDS) {
@@ -176,7 +176,7 @@ function updateRoom(room) {
     room.lastInterruptElapsedMs = null;
   }
 
-  // 运行状态超时：开局超过5秒，判定B获胜
+  // 杩愯鐘舵€佽秴鏃讹細寮€灞€瓒呰繃5绉掞紝鍒ゅ畾B鑾疯儨
   if (room.systemState === SystemState.RUNNING &&
       room.roundStartTime !== null &&
       now - room.roundStartTime >= ROUND_TIMEOUT_SECONDS) {
@@ -190,7 +190,7 @@ function updateRoom(room) {
     room.bWins += 1;
   }
 
-  // 运行状态下A的施法进度更�?
+  // 杩愯鐘舵€佷笅A鐨勬柦娉曡繘搴︽洿鏂?
   if (room.systemState === SystemState.RUNNING && room.aState === AState.CASTING) {
     const elapsed = now - room.startTime;
     room.barFraction = elapsed / CAST_DURATION;
@@ -205,17 +205,17 @@ function updateRoom(room) {
   }
 }
 
-// 处理客户端输�?
+// 澶勭悊瀹㈡埛绔緭鍏?
 function handleInput(room, role, action) {
   const now = nowSec();
-  // A、B玩家准备就绪
+  // A銆丅鐜╁鍑嗗灏辩华
   if (action === 'ready') {
     if (role === 'A') room.aReady = true;
     if (role === 'B') room.bReady = true;
     return;
   }
 
-  // 双方确认后交换角�?
+  // 鍙屾柟纭鍚庝氦鎹㈣鑹?
   if (action === 'swap_confirm') {
     if (role === 'A') room.swapConfirmA = true;
     if (role === 'B') room.swapConfirmB = true;
@@ -226,7 +226,7 @@ function handleInput(room, role, action) {
     return;
   }
 
-  // 手动清零战绩（仅对战双方可触发）
+  // 鎵嬪姩娓呴浂鎴樼哗锛堜粎瀵规垬鍙屾柟鍙Е鍙戯級
   if (action === 'reset_stats') {
     if (role === 'A' || role === 'B') {
       resetRoomState(room, { resetScore: true });
@@ -234,7 +234,7 @@ function handleInput(room, role, action) {
     return;
   }
 
-  // A玩家开始读�?
+  // A鐜╁寮€濮嬭鏉?
   if (action === 'start_cast' && role === 'A') {
     if (room.systemState !== SystemState.RUNNING) return;
     room.aState = AState.CASTING;
@@ -243,7 +243,7 @@ function handleInput(room, role, action) {
     return;
   }
 
-  // A玩家取消读条
+  // A鐜╁鍙栨秷璇绘潯
   if (action === 'cancel_cast' && role === 'A') {
     if (room.systemState !== SystemState.RUNNING) return;
     room.aState = AState.NO_CASTING;
@@ -251,7 +251,7 @@ function handleInput(room, role, action) {
     return;
   }
 
-  // B玩家使用打断
+  // B鐜╁浣跨敤鎵撴柇
   if (action === 'interrupt' && role === 'B') {
     if (room.bCdEndTime !== null && now < room.bCdEndTime) return;
     if (room.systemState === SystemState.RUNNING && room.startTime !== null) {
@@ -286,17 +286,17 @@ wss.on('connection', (ws) => {
     return info ? info.role : null;
   }
 
-  // 处理客户端消�?
+  // 澶勭悊瀹㈡埛绔秷鎭?
   ws.on('message', (data) => {
     let msg = null;
     try { msg = JSON.parse(data.toString()); } catch (e) { return; }
 
-    //  加入房间消息: {type:'join', roomId?, role?}
+    //  鍔犲叆鎴块棿娑堟伅: {type:'join', roomId?, role?}
     if (msg.type === 'join') {
       if (room) {
         room.clients.delete(ws);
       }
-      // 获取或创建房间，分配角色
+      // 鑾峰彇鎴栧垱寤烘埧闂达紝鍒嗛厤瑙掕壊
       room = getRoom(msg.roomId || 'default');
       role = msg.role || assignRole(room);
       room.clients.set(ws, { role });
@@ -305,7 +305,7 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    // 测试ping时间延迟: {type:'ping', clientSent}
+    // 娴嬭瘯ping鏃堕棿寤惰繜: {type:'ping', clientSent}
     if (msg.type === 'ping') {
       const serverNow = nowSec();
       try {
@@ -314,18 +314,18 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    //  处理输入消息: {type:'input', action}
+    //  澶勭悊杈撳叆娑堟伅: {type:'input', action}
     if (!room) return;
     const currentRole = getCurrentRole();
     if (!currentRole) return;
 
-    // 处理输入动作
+    // 澶勭悊杈撳叆鍔ㄤ綔
     if (msg.type === 'input') {
       handleInput(room, currentRole, msg.action);
     }
   });
 
-  // 处理连接关闭
+  // 澶勭悊杩炴帴鍏抽棴
   ws.on('close', () => {
     if (!room) return;
     room.clients.delete(ws);
@@ -337,8 +337,8 @@ wss.on('connection', (ws) => {
 });
 
 
-// 定时更新房间状态并广播
-// 广播信息�?{type:'state', systemState, aState, bState, aReady, bReady, barFraction, bCdEndTime, bCdRemaining}
+// 瀹氭椂鏇存柊鎴块棿鐘舵€佸苟骞挎挱
+// 骞挎挱淇℃伅锛?{type:'state', systemState, aState, bState, aReady, bReady, barFraction, bCdEndTime, bCdRemaining}
 setInterval(() => {
   for (const room of rooms.values()) {
     updateRoom(room);
@@ -368,4 +368,5 @@ setInterval(() => {
 server.listen(PORT, () => {
   console.log(`WS server running on :${PORT}`);
 });
+
 

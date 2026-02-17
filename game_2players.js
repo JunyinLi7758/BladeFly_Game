@@ -1,19 +1,19 @@
-// game_2players.js
+ï»¿// game_2players.js
 import { Assets, initImages, setSkillIcon } from './assets.js';
 import { preloadAllSounds, unlockAudio, playSound, stopSound } from './audio.js';
 
-// #region  0) »ù±¾³£Á¿Óë»­²¼£¨canvas / resize / layout»º´æ£©==========
+// #region  0) åŸºæœ¬å¸¸é‡ä¸ç”»å¸ƒï¼ˆcanvas / resize / layoutç¼“å­˜ï¼‰==========
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 let WIDTH = 900;
 let HEIGHT = 450;
 
-// ¶ÁÌõ²ÎÊı
-const BAR_DURATION = 0.56;   // Ãë
+// è¯»æ¡å‚æ•°
+const BAR_DURATION = 0.56;   // ç§’
 const BAR_WIDTH_MAX = 600;   // px
 
-// ½ø¶ÈÌõÑÕÉ« & µ­³ö
+// è¿›åº¦æ¡é¢œè‰² & æ·¡å‡º
 const BAR_COLOR_NORMAL = '0,180,90';
 const BAR_COLOR_HIT    = '255,64,64';
 
@@ -25,7 +25,7 @@ const UI = {
   barBg: '#505050',
   iconFallback: '#4a6fa5',
   iconStroke: '#666',
-  title: '½£·ÉÄ£ÄâÆ÷ v1.7'
+  title: 'å‰‘é£æ¨¡æ‹Ÿå™¨ v1.7'
 };
 let barRgb = BAR_COLOR_NORMAL;
 let barAlpha = 1.0;
@@ -34,10 +34,10 @@ let barFadeStartTime = 0;
 const BAR_FADE_DURATION = 0.4;
 let barHitFraction = 0.0;
 
-// ·½°¸A£º²¼¾Ö»º´æ
+// æ–¹æ¡ˆAï¼šå¸ƒå±€ç¼“å­˜
 let layoutDirty = true;
 
-// ²¼¾Ö»º´æ±äÁ¿
+// å¸ƒå±€ç¼“å­˜å˜é‡
 let iconSize = 0, iconX = 0, iconY = 0;
 let titleSize = 0, msgSize = 0, resultSize = 0;
 let barWidth = 0, barHeight = 0, barXAdj = 0, barY = 0;
@@ -48,7 +48,7 @@ let logoAspect = 4;
 let uiShiftY = 0;
 
 function layout() {
-  // Ö÷½çÃæÕûÌåÏÂÒÆÁ¿£¨¿É°´Ğèµ÷Õû£©
+  // ä¸»ç•Œé¢æ•´ä½“ä¸‹ç§»é‡ï¼ˆå¯æŒ‰éœ€è°ƒæ•´ï¼‰
   uiShiftY = Math.max(0, Math.min(HEIGHT * 0.0, 90));
 
   iconSize = Math.min(WIDTH * 0.15, 100);
@@ -100,11 +100,11 @@ window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 100)
 
 
 
-// #region  1) Ö°ÒµÑ¡ÔñÏµÍ³£¨JOBS / currentJob / setJob / getCdSeconds£©==========
+// #region  1) èŒä¸šé€‰æ‹©ç³»ç»Ÿï¼ˆJOBS / currentJob / setJob / getCdSecondsï¼‰==========
 const JOBS = {
-  Blade:  { name: '½£´¿', skillname: '½£·É¾ªÌì', icon: 'img/icon_blade.png',  skillSound: 'skill_blade',  cd: 3.0 },
-  Flower: { name: 'Íò»¨', skillname: 'ØÊÒõ',   icon: 'img/icon_flower.png', skillSound: 'skill_flower', cd: 3.0 },
-  Toxic:  { name: 'Îå¶¾', skillname: 'Áé¹Æ',     icon: 'img/icon_toxic.png',  skillSound: 'skill_toxic',  cd: 3.0 },
+  Blade:  { name: 'å‰‘çº¯', skillname: 'å‰‘é£æƒŠå¤©', icon: 'img/icon_blade.png',  skillSound: 'skill_blade',  cd: 3.0 },
+  Flower: { name: 'ä¸‡èŠ±', skillname: 'å¥é˜´',   icon: 'img/icon_flower.png', skillSound: 'skill_flower', cd: 3.0 },
+  Toxic:  { name: 'äº”æ¯’', skillname: 'çµè›Š',     icon: 'img/icon_toxic.png',  skillSound: 'skill_toxic',  cd: 3.0 },
 };
 
 let currentJobKey = 'Blade';
@@ -121,7 +121,7 @@ function setJob(jobKey) {
   currentJob = JOBS[jobKey];
   setSkillIcon(currentJob.icon);
   skillIconInitialized = Boolean(Assets.skillImg && Assets.skillImg.src);
-  message = `³¤°´¶ÁÌõÆÛÆ­${currentJob.name}£¬Æ­µ½±ğÍüÁËÉúÌ«¼«£¡`;
+  message = `é•¿æŒ‰è¯»æ¡æ¬ºéª—${currentJob.name}ï¼Œéª—åˆ°åˆ«å¿˜äº†ç”Ÿå¤ªæï¼`;
 }
 
 function ensureSkillIcon() {
@@ -137,7 +137,7 @@ function ensureSkillIcon() {
 
 
 
-// #region  2) ×ÊÔ´³õÊ¼»¯£¨Í¼Æ¬/ÒôĞ§Ô¤¼ÓÔØ£© ==========
+// #region  2) èµ„æºåˆå§‹åŒ–ï¼ˆå›¾ç‰‡/éŸ³æ•ˆé¢„åŠ è½½ï¼‰ ==========
 initImages();
 setSkillIcon(currentJob.icon);
 skillIconInitialized = Boolean(Assets.skillImg && Assets.skillImg.src);
@@ -147,7 +147,7 @@ preloadAllSounds();
 
 
 
-// #region  3) ÓÎÏ·×´Ì¬»ú Óë ³õÊ¼±äÁ¿ ======
+// #region  3) æ¸¸æˆçŠ¶æ€æœº ä¸ åˆå§‹å˜é‡ ======
 const SystemState = {
   IDLE: 'IDLE',
   PREPARE: 'PREPARE',
@@ -175,16 +175,16 @@ let systemState = SystemState.IDLE;
 let aState = AState.NO_CASTING;
 let bState = BState.NO_CD;
 let bWinReason = null;
-let message = 'Ë«ÈË¶ÔÕ½Ä£Ê½';
+let message = 'åŒäººå¯¹æˆ˜æ¨¡å¼';
 
 // WS
 // let ROOM_ID = (new URLSearchParams(location.search)).get('room') || 'default';
 
 // =========================
-// ROOM_ID£ºÖ§³Ö URL ²ÎÊı + ±¾µØ±£´æ + JS Ä¬ÈÏ
-// URL ²ÎÊıÊ¾Àı£º?room=abc »ò ?r=abc
+// ROOM_IDï¼šæ”¯æŒ URL å‚æ•° + æœ¬åœ°ä¿å­˜ + JS é»˜è®¤
+// URL å‚æ•°ç¤ºä¾‹ï¼š?room=abc æˆ– ?r=abc
 // =========================
-const ROOM_ID_JS_DEFAULT = 'default'; // ¡û ¸Ä³ÉÄãÏëÒªµÄÄ¬ÈÏ roomId£¬±ÈÈç 'room_001'
+const ROOM_ID_JS_DEFAULT = 'default'; // â† æ”¹æˆä½ æƒ³è¦çš„é»˜è®¤ roomIdï¼Œæ¯”å¦‚ 'room_001'
 
 function getRoomIdFromUrl() {
   try {
@@ -197,15 +197,15 @@ function getRoomIdFromUrl() {
 }
 
 function getInitialRoomId() {
-  // 1) ÓÅÏÈÊ¹ÓÃ URL ²ÎÊı
+  // 1) ä¼˜å…ˆä½¿ç”¨ URL å‚æ•°
   const fromUrl = getRoomIdFromUrl();
   if (fromUrl) return fromUrl;
 
-  // 2) Æä´ÎÊ¹ÓÃ±¾µØ±£´æµÄÉÏ´Î·¿¼äºÅ
+  // 2) å…¶æ¬¡ä½¿ç”¨æœ¬åœ°ä¿å­˜çš„ä¸Šæ¬¡æˆ¿é—´å·
   const saved = localStorage.getItem('roomId');
   if (saved && saved.trim()) return saved.trim();
 
-  // 3) ·ñÔòÓÃ JS ÄÚÖÃÄ¬ÈÏÖµ
+  // 3) å¦åˆ™ç”¨ JS å†…ç½®é»˜è®¤å€¼
   return ROOM_ID_JS_DEFAULT;
 }
 
@@ -292,7 +292,7 @@ loadSharedGameRules();
 
 //#endregion
 
-//#region  4) AI ²ßÂÔÏµÍ³ ======
+//#region  4) AI ç­–ç•¥ç³»ç»Ÿ ======
 // ====== Strategy ======
 const AStrategy = {
   startChance: 0.5,
@@ -321,7 +321,7 @@ function BUpdateStrategyRandom() {
 }
 //#endregion
 
-// #region  5) Íæ¼ÒAB ²Ù×÷º¯Êı ======
+// #region  5) ç©å®¶AB æ“ä½œå‡½æ•° ======
 // ====== A system ======
 function AReady() {
   if (wsConnected) {
@@ -425,7 +425,7 @@ function BInterrupt(now) {
 }
 //#endregion
 
-//#region  6) ·¿¼ä×´Ì¬¸üĞÂÓë´¦Àíº¯Êı ======
+//#region  6) æˆ¿é—´çŠ¶æ€æ›´æ–°ä¸å¤„ç†å‡½æ•° ======
 // ====== System ======
 function maybeEnterPrepare(now) {
   if ((systemState === SystemState.IDLE || systemState === SystemState.AWIN || systemState === SystemState.BWIN
@@ -579,7 +579,7 @@ function stopAllSounds() {
 }
 //#endregion
 
-//#region  7) WS Í¨Ñ¶²¿·Ö ======
+//#region  7) WS é€šè®¯éƒ¨åˆ† ======
 function sendInput(action) {
   if (!wsConnected || !ws) return;
   ws.send(JSON.stringify({ type: 'input', action }));
@@ -629,11 +629,11 @@ function connectWS() {
       resetBarVisuals();
       updateRoomPanels();
       if (wsRole === 'A') {
-        message = 'ÄãÊÇÆø´¿£º³¤°´¶ÁÌõ£¬ËÉ¿ªÈ¡Ïû¡£';
+        message = 'ä½ æ˜¯æ°”çº¯ï¼šé•¿æŒ‰è¯»æ¡ï¼Œæ¾å¼€å–æ¶ˆã€‚';
       } else if (wsRole === 'B') {
-        message = 'ÄãÊÇ½£´¿£º¶Ì°´´ò¶Ï£¬×¢ÒâÀäÈ´¡£';
+        message = 'ä½ æ˜¯å‰‘çº¯ï¼šçŸ­æŒ‰æ‰“æ–­ï¼Œæ³¨æ„å†·å´ã€‚';
       } else {
-        message = 'ÅÔ¹ÛÖĞ£ºµÈ´ıÏÂÒ»¾Ö¡£';
+        message = 'æ—è§‚ä¸­ï¼šç­‰å¾…ä¸‹ä¸€å±€ã€‚';
       }
       return;
     }
@@ -644,9 +644,9 @@ function connectWS() {
       swapConfirmB = false;
       updateRoomPanels();
       if (wsRole === 'A') {
-        message = '½ÇÉ«ÒÑ½»»»£ºÄãÏÖÔÚÊÇÆø´¿¡£';
+        message = 'è§’è‰²å·²äº¤æ¢ï¼šä½ ç°åœ¨æ˜¯æ°”çº¯ã€‚';
       } else if (wsRole === 'B') {
-        message = '½ÇÉ«ÒÑ½»»»£ºÄãÏÖÔÚÊÇ½£´¿¡£';
+        message = 'è§’è‰²å·²äº¤æ¢ï¼šä½ ç°åœ¨æ˜¯å‰‘çº¯ã€‚';
       }
       return;
     }
@@ -716,11 +716,11 @@ function connectWS() {
           barFraction = 0.0;
           resetBarVisuals();
           if (wsRole === 'A') {
-            message = 'ÄãÊÇÆø´¿£ºµã»÷/´¥ÆÁ×¼±¸£¬³¤°´¶ÁÌõ¡£';
+            message = 'ä½ æ˜¯æ°”çº¯ï¼šç‚¹å‡»/è§¦å±å‡†å¤‡ï¼Œé•¿æŒ‰è¯»æ¡ã€‚';
           } else if (wsRole === 'B') {
-            message = 'ÄãÊÇ½£´¿£ºµã»÷/´¥ÆÁ×¼±¸£¬¶Ì°´´ò¶Ï¡£';
+            message = 'ä½ æ˜¯å‰‘çº¯ï¼šç‚¹å‡»/è§¦å±å‡†å¤‡ï¼ŒçŸ­æŒ‰æ‰“æ–­ã€‚';
           } else {
-            message = 'ÅÔ¹ÛÖĞ£ºµÈ´ıÏÂÒ»¾Ö¡£';
+            message = 'æ—è§‚ä¸­ï¼šç­‰å¾…ä¸‹ä¸€å±€ã€‚';
           }
         }
         if (systemState === SystemState.AWIN) {
@@ -776,7 +776,7 @@ function connectWS() {
 }
 //#endregion
 
-//#region  8) Input: °´¼üÓë»­²¼³¤°´/¶Ì°´Âß¼­ ======
+//#region  8) Input: æŒ‰é”®ä¸ç”»å¸ƒé•¿æŒ‰/çŸ­æŒ‰é€»è¾‘ ======
 let recentLongPress = 0; // seconds, used to avoid double-triggering click after long-press
 let suppressGlobalInputUntil = 0;
 
@@ -791,7 +791,7 @@ function isUiControlTarget(target) {
   ));
 }
 
-// Canvas press handling: ³¤°´´¥·¢ A start_cast£¬ËÉ¿ª´¥·¢ cancel£»¶Ì°´×÷Îª´ò¶Ï£¨B£©»ò×¼±¸£¨A£©
+// Canvas press handling: é•¿æŒ‰è§¦å‘ A start_castï¼Œæ¾å¼€è§¦å‘ cancelï¼›çŸ­æŒ‰ä½œä¸ºæ‰“æ–­ï¼ˆBï¼‰æˆ–å‡†å¤‡ï¼ˆAï¼‰
 function setupCanvasInput() {
   if (!canvas) return;
 
@@ -808,7 +808,7 @@ function setupCanvasInput() {
   }
 
   function startPress(e) {
-    // ×èÖ¹´¥ÃşÒı·¢µÄ¹ö¶¯/µã»÷
+    // é˜»æ­¢è§¦æ‘¸å¼•å‘çš„æ»šåŠ¨/ç‚¹å‡»
     if (e.cancelable) e.preventDefault();
     pressFromCanvas = true;
     ensureAudioUnlocked();
@@ -818,7 +818,7 @@ function setupCanvasInput() {
       longPressFired = true;
       const now = performance.now() / 1000;
       recentLongPress = now;
-      // Ö»ÓĞ A ·¢Æğ¶ÁÌõ£¨·şÎñÆ÷»áºöÂÔÎŞĞ§½ÇÉ«£©
+      // åªæœ‰ A å‘èµ·è¯»æ¡ï¼ˆæœåŠ¡å™¨ä¼šå¿½ç•¥æ— æ•ˆè§’è‰²ï¼‰
       AStartCasting(now);
     }, LONG_MS);
   }
@@ -830,31 +830,31 @@ function setupCanvasInput() {
     const now = performance.now() / 1000;
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
     if (longPressFired) {
-      // ³¤°´ºóËÉ¿ª -> È¡Ïû¶ÁÌõ
+      // é•¿æŒ‰åæ¾å¼€ -> å–æ¶ˆè¯»æ¡
       recentLongPress = now;
       ACancelCasting(now);
       longPressFired = false;
     } else {
-      // ¶Ì°´£ºÈç¹ûÊÇ B Ôò´¥·¢´ò¶Ï£»·ñÔòÊÓÎª×¼±¸£¨µ¥»÷×¼±¸£©
+      // çŸ­æŒ‰ï¼šå¦‚æœæ˜¯ B åˆ™è§¦å‘æ‰“æ–­ï¼›å¦åˆ™è§†ä¸ºå‡†å¤‡ï¼ˆå•å‡»å‡†å¤‡ï¼‰
       if (wsConnected) {
         if (wsRole === 'B' && !bComMode) {
           BInterrupt(now);
         } else if (wsRole === 'A' && !aComMode) {
-          // µ¥»÷×¼±¸£¨ÈôÔÚ IDLE£©»ò¶Ì°´²»´¥·¢¶ÁÌõ
+          // å•å‡»å‡†å¤‡ï¼ˆè‹¥åœ¨ IDLEï¼‰æˆ–çŸ­æŒ‰ä¸è§¦å‘è¯»æ¡
           if (systemState === SystemState.IDLE) AReady();
         }
       } else {
-        // ±¾µØÄ£Ê½£ºµ¥»÷×÷Îª A µÄ×¼±¸»ò¶Ì°´´¥·¢ AStart
+        // æœ¬åœ°æ¨¡å¼ï¼šå•å‡»ä½œä¸º A çš„å‡†å¤‡æˆ–çŸ­æŒ‰è§¦å‘ AStart
         if (systemState === SystemState.IDLE) {
           AReady();
         } else {
-          // ÈôÏëÔÚ±¾µØ¶Ì°´Ò²´¥·¢´ò¶Ï£¬Çë¸ÄÎª BInterrupt
+          // è‹¥æƒ³åœ¨æœ¬åœ°çŸ­æŒ‰ä¹Ÿè§¦å‘æ‰“æ–­ï¼Œè¯·æ”¹ä¸º BInterrupt
         }
       }
     }
   }
 
-  // Êó±ê
+  // é¼ æ ‡
   canvas.addEventListener('mousedown', startPress);
   window.addEventListener('mouseup', endPress);
   window.addEventListener('blur', () => {
@@ -863,7 +863,7 @@ function setupCanvasInput() {
     longPressFired = false;
   });
 
-  // ´¥Ãş
+  // è§¦æ‘¸
   canvas.addEventListener('touchstart', startPress, { passive: false });
   canvas.addEventListener('touchend', endPress);
   canvas.addEventListener('touchcancel', endPress);
@@ -882,25 +882,25 @@ function updateRoomPanels() {
     inRoomEl.style.display = 'flex';
     if (roomIdLabelEl) roomIdLabelEl.textContent = ROOM_ID || 'default';
     if (roleValueEl) {
-      if (wsRole === 'A') roleValueEl.textContent = 'Æø´¿';
-      else if (wsRole === 'B') roleValueEl.textContent = '½£´¿';
-      else roleValueEl.textContent = 'ÅÔ¹Û';
+      if (wsRole === 'A') roleValueEl.textContent = 'æ°”çº¯';
+      else if (wsRole === 'B') roleValueEl.textContent = 'å‰‘çº¯';
+      else roleValueEl.textContent = 'æ—è§‚';
     }
     if (btnSwapRoleEl) {
       const canSwap = wsRole === 'A' || wsRole === 'B';
       btnSwapRoleEl.disabled = !canSwap;
-      if (wsRole === 'A' && swapConfirmA) btnSwapRoleEl.textContent = 'ÒÑÈ·ÈÏ»»½Ç';
-      else if (wsRole === 'B' && swapConfirmB) btnSwapRoleEl.textContent = 'ÒÑÈ·ÈÏ»»½Ç';
-      else btnSwapRoleEl.textContent = 'È·ÈÏ»»½Ç';
+      if (wsRole === 'A' && swapConfirmA) btnSwapRoleEl.textContent = 'å·²ç¡®è®¤æ¢è§’';
+      else if (wsRole === 'B' && swapConfirmB) btnSwapRoleEl.textContent = 'å·²ç¡®è®¤æ¢è§’';
+      else btnSwapRoleEl.textContent = 'ç¡®è®¤æ¢è§’';
     }
     if (btnResetScoreEl) {
       const canResetScore = wsRole === 'A' || wsRole === 'B';
       btnResetScoreEl.disabled = !canResetScore;
-      btnResetScoreEl.textContent = 'ÇåÁãÕ½¼¨';
+      btnResetScoreEl.textContent = 'æ¸…é›¶æˆ˜ç»©';
     }
     if (btnShareRoomEl) {
       btnShareRoomEl.disabled = false;
-      btnShareRoomEl.textContent = '·ÖÏí·¿¼ä';
+      btnShareRoomEl.textContent = 'åˆ†äº«æˆ¿é—´';
     }
     return;
   }
@@ -910,15 +910,15 @@ function updateRoomPanels() {
   if (roleValueEl) roleValueEl.textContent = '-';
   if (btnSwapRoleEl) {
     btnSwapRoleEl.disabled = true;
-    btnSwapRoleEl.textContent = 'È·ÈÏ»»½Ç';
+    btnSwapRoleEl.textContent = 'ç¡®è®¤æ¢è§’';
   }
   if (btnResetScoreEl) {
     btnResetScoreEl.disabled = true;
-    btnResetScoreEl.textContent = 'ÇåÁãÕ½¼¨';
+    btnResetScoreEl.textContent = 'æ¸…é›¶æˆ˜ç»©';
   }
   if (btnShareRoomEl) {
     btnShareRoomEl.disabled = true;
-    btnShareRoomEl.textContent = '·ÖÏí·¿¼ä';
+    btnShareRoomEl.textContent = 'åˆ†äº«æˆ¿é—´';
   }
 }
 
@@ -927,7 +927,7 @@ function applyRoomPanelCollapsed(collapsed) {
   inRoomEl.classList.toggle('room-panel-collapsed', Boolean(collapsed));
   if (btnMinRoomPanelEl) {
     btnMinRoomPanelEl.textContent = collapsed ? '+' : '-';
-    btnMinRoomPanelEl.title = collapsed ? 'Õ¹¿ª' : '×îĞ¡»¯';
+    btnMinRoomPanelEl.title = collapsed ? 'å±•å¼€' : 'æœ€å°åŒ–';
   }
 }
 
@@ -969,10 +969,10 @@ async function copyTextToClipboard(text) {
   }
 }
 
-// °´Å¥Óë¿ª¹Ø°ó¶¨
+// æŒ‰é’®ä¸å¼€å…³ç»‘å®š
 window.addEventListener('DOMContentLoaded', () => {
   function ensureRoomUI() {
-  // Èç¹û HTML ÒÑ¾­ÓĞÁËÕâĞ©ÔªËØ£¬¾Í²»ÖØ¸´´´½¨
+  // å¦‚æœ HTML å·²ç»æœ‰äº†è¿™äº›å…ƒç´ ï¼Œå°±ä¸é‡å¤åˆ›å»º
   const existInput = document.getElementById('roomIdInput');
   const existBtn = document.getElementById('btnJoinRoom');
   const existLeaveBtn = document.getElementById('btnLeaveRoom');
@@ -981,7 +981,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const existInRoom = document.getElementById('inRoomBanner');
   if (existInput && existBtn && existLeaveBtn && existMinBtn && existPre && existInRoom) return;
 
-  // ÈİÆ÷£¨Ğü¸¡ÔÚ×óÉÏ½Ç£¬±ÜÃâµ²×¡»­ÃæÖĞÑë£©
+  // å®¹å™¨ï¼ˆæ‚¬æµ®åœ¨å·¦ä¸Šè§’ï¼Œé¿å…æŒ¡ä½ç”»é¢ä¸­å¤®ï¼‰
   const wrap = document.createElement('div');
   wrap.id = 'roomPanelAuto';
   wrap.style.cssText = `
@@ -995,7 +995,7 @@ window.addEventListener('DOMContentLoaded', () => {
     backdrop-filter: blur(6px);
   `;
 
-  // Ô¤¼ÓÈëÃæ°å
+  // é¢„åŠ å…¥é¢æ¿
   const preJoin = document.createElement('div');
   preJoin.id = 'preJoinRules';
   preJoin.style.cssText = `display:flex; align-items:center; gap:8px;`;
@@ -1011,7 +1011,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   const btn = document.createElement('button');
   btn.id = 'btnJoinRoom';
-  btn.textContent = '¼ÓÈë';
+  btn.textContent = 'åŠ å…¥';
   btn.style.cssText = `
     padding: 6px 10px; border-radius: 8px; border: 0;
     background: rgba(255,255,255,0.18); color: #fff; cursor: pointer;
@@ -1020,7 +1020,7 @@ window.addEventListener('DOMContentLoaded', () => {
   preJoin.appendChild(input);
   preJoin.appendChild(btn);
 
-  // ÒÑ¼ÓÈëÃæ°å
+  // å·²åŠ å…¥é¢æ¿
   const inRoom = document.createElement('div');
   inRoom.id = 'inRoomBanner';
   inRoom.style.cssText = `display:none; flex-direction:column; gap:4px;`;
@@ -1029,12 +1029,12 @@ window.addEventListener('DOMContentLoaded', () => {
   header.className = 'room-header';
   const title = document.createElement('div');
   title.className = 'room-title';
-  title.textContent = 'ÒÑ½øÈë·¿¼ä';
+  title.textContent = 'å·²è¿›å…¥æˆ¿é—´';
   const btnMin = document.createElement('button');
   btnMin.id = 'btnMinRoomPanel';
   btnMin.className = 'job-btn room-min-btn';
   btnMin.textContent = '-';
-  btnMin.title = '×îĞ¡»¯';
+  btnMin.title = 'æœ€å°åŒ–';
   header.appendChild(title);
   header.appendChild(btnMin);
 
@@ -1048,28 +1048,28 @@ window.addEventListener('DOMContentLoaded', () => {
   actions.className = 'room-actions';
   const btnSwap = document.createElement('button');
   btnSwap.id = 'btnSwapRole';
-  btnSwap.textContent = 'È·ÈÏ»»½Ç';
+  btnSwap.textContent = 'ç¡®è®¤æ¢è§’';
   btnSwap.style.cssText = `
     padding: 6px 10px; border-radius: 8px; border: 0;
     background: rgba(64,130,170,0.85); color: #fff; cursor: pointer;
   `;
   const btnResetScore = document.createElement('button');
   btnResetScore.id = 'btnResetScore';
-  btnResetScore.textContent = 'ÇåÁãÕ½¼¨';
+  btnResetScore.textContent = 'æ¸…é›¶æˆ˜ç»©';
   btnResetScore.style.cssText = `
     padding: 6px 10px; border-radius: 8px; border: 0;
     background: rgba(190,130,40,0.9); color: #fff; cursor: pointer;
   `;
   const btnShareRoom = document.createElement('button');
   btnShareRoom.id = 'btnShareRoom';
-  btnShareRoom.textContent = '·ÖÏí·¿¼ä';
+  btnShareRoom.textContent = 'åˆ†äº«æˆ¿é—´';
   btnShareRoom.style.cssText = `
     padding: 6px 10px; border-radius: 8px; border: 0;
     background: rgba(80,160,95,0.9); color: #fff; cursor: pointer;
   `;
   const btnLeave = document.createElement('button');
   btnLeave.id = 'btnLeaveRoom';
-  btnLeave.textContent = 'ÍË³ö·¿¼ä';
+  btnLeave.textContent = 'é€€å‡ºæˆ¿é—´';
   btnLeave.style.cssText = `
     padding: 6px 10px; border-radius: 8px; border: 0;
     background: rgba(200,80,80,0.8); color: #fff; cursor: pointer;
@@ -1104,7 +1104,7 @@ window.addEventListener('DOMContentLoaded', () => {
   roomIdLabelEl = document.getElementById('roomIdLabel');
   roleValueEl = document.getElementById('roleValue');
 
-  // ¶µµ×£º¾ÉÒ³Ãæ/ÖØ¸´ DOM Ê±£¬È·±£¡°µ±Ç° inRoomBanner¡±ÀïÒ»¶¨ÓĞÍË³ö°´Å¥¡£
+  // å…œåº•ï¼šæ—§é¡µé¢/é‡å¤ DOM æ—¶ï¼Œç¡®ä¿â€œå½“å‰ inRoomBannerâ€é‡Œä¸€å®šæœ‰é€€å‡ºæŒ‰é’®ã€‚
   if (inRoomEl) {
     let leaveBtnInBanner = inRoomEl.querySelector('#btnLeaveRoom');
     if (!leaveBtnInBanner) {
@@ -1117,7 +1117,7 @@ window.addEventListener('DOMContentLoaded', () => {
       const btn = document.createElement('button');
       btn.id = 'btnLeaveRoom';
       btn.className = 'job-btn room-exit-btn';
-      btn.textContent = 'ÍË³ö·¿¼ä';
+      btn.textContent = 'é€€å‡ºæˆ¿é—´';
       btn.style.display = 'inline-block';
       btn.style.visibility = 'visible';
       actions.appendChild(btn);
@@ -1135,7 +1135,7 @@ window.addEventListener('DOMContentLoaded', () => {
       const btn = document.createElement('button');
       btn.id = 'btnSwapRole';
       btn.className = 'job-btn room-swap-btn';
-      btn.textContent = 'È·ÈÏ»»½Ç';
+      btn.textContent = 'ç¡®è®¤æ¢è§’';
       actions.insertBefore(btn, actions.firstChild);
       swapBtnInBanner = btn;
     }
@@ -1151,7 +1151,7 @@ window.addEventListener('DOMContentLoaded', () => {
       const btn = document.createElement('button');
       btn.id = 'btnResetScore';
       btn.className = 'job-btn room-reset-btn';
-      btn.textContent = 'ÇåÁãÕ½¼¨';
+      btn.textContent = 'æ¸…é›¶æˆ˜ç»©';
       actions.insertBefore(btn, btnLeaveRoomEl || null);
       resetScoreBtnInBanner = btn;
     }
@@ -1167,7 +1167,7 @@ window.addEventListener('DOMContentLoaded', () => {
       const btn = document.createElement('button');
       btn.id = 'btnShareRoom';
       btn.className = 'job-btn room-share-btn';
-      btn.textContent = '·ÖÏí·¿¼ä';
+      btn.textContent = 'åˆ†äº«æˆ¿é—´';
       actions.insertBefore(btn, btnLeaveRoomEl || null);
       shareRoomBtnInBanner = btn;
     }
@@ -1181,7 +1181,7 @@ window.addEventListener('DOMContentLoaded', () => {
         header.className = 'room-header';
         const title = document.createElement('div');
         title.className = 'room-title';
-        title.textContent = 'ÒÑ½øÈë·¿¼ä';
+        title.textContent = 'å·²è¿›å…¥æˆ¿é—´';
         header.appendChild(title);
         inRoomEl.insertBefore(header, inRoomEl.firstChild);
       }
@@ -1189,7 +1189,7 @@ window.addEventListener('DOMContentLoaded', () => {
       btn.id = 'btnMinRoomPanel';
       btn.className = 'job-btn room-min-btn';
       btn.textContent = '-';
-      btn.title = '×îĞ¡»¯';
+      btn.title = 'æœ€å°åŒ–';
       header.appendChild(btn);
       btnMinRoomPanelEl = btn;
     }
@@ -1199,7 +1199,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const savedRoomPanelCollapsed = localStorage.getItem('roomPanelCollapsed') === '1';
   applyRoomPanelCollapsed(savedRoomPanelCollapsed);
 
-  // ³õÊ¼»¯·¿¼äÊäÈëÖµ
+  // åˆå§‹åŒ–æˆ¿é—´è¾“å…¥å€¼
   if (roomInputEl) roomInputEl.value = ROOM_ID || 'default';
   if (ROOM_ID_FROM_URL && ROOM_ID) {
     localStorage.setItem('roomId', ROOM_ID);
@@ -1269,7 +1269,7 @@ window.addEventListener('DOMContentLoaded', () => {
       sendInput('swap_confirm');
       if (wsRole === 'A') swapConfirmA = true;
       if (wsRole === 'B') swapConfirmB = true;
-      message = 'ÒÑÈ·ÈÏ»»½Ç£¬µÈ´ı¶Ô·½È·ÈÏ...';
+      message = 'å·²ç¡®è®¤æ¢è§’ï¼Œç­‰å¾…å¯¹æ–¹ç¡®è®¤...';
       updateRoomPanels();
     });
   }
@@ -1280,7 +1280,7 @@ window.addEventListener('DOMContentLoaded', () => {
       if (wsRole !== 'A' && wsRole !== 'B') return;
       sendInput('reset_stats');
       resetScoreboardLocal();
-      message = 'Õ½¼¨ÒÑÇåÁã¡£';
+      message = 'æˆ˜ç»©å·²æ¸…é›¶ã€‚';
       updateRoomPanels();
     });
   }
@@ -1290,9 +1290,9 @@ window.addEventListener('DOMContentLoaded', () => {
       const shareUrl = buildRoomShareUrl(ROOM_ID);
       const copied = await copyTextToClipboard(shareUrl);
       if (copied) {
-        message = '·¿¼äÁ´½ÓÒÑ¸´ÖÆ£¬¿ÉÖ±½Ó·¢ËÍ¸øºÃÓÑ¡£';
+        message = 'æˆ¿é—´é“¾æ¥å·²å¤åˆ¶ï¼Œå¯ç›´æ¥å‘é€ç»™å¥½å‹ã€‚';
       } else {
-        message = `¸´ÖÆÊ§°Ü£¬ÇëÊÖ¶¯¸´ÖÆ£º${shareUrl}`;
+        message = `å¤åˆ¶å¤±è´¥ï¼Œè¯·æ‰‹åŠ¨å¤åˆ¶ï¼š${shareUrl}`;
       }
       updateRoomPanels();
     });
@@ -1306,17 +1306,17 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ÈôÍ¨¹ı URL Ö¸¶¨·¿¼ä£¬»òÒÑÓĞ·Ç default µÄ·¿¼äºÅ£¬Ôò×Ô¶¯¼ÓÈë
+  // è‹¥é€šè¿‡ URL æŒ‡å®šæˆ¿é—´ï¼Œæˆ–å·²æœ‰é default çš„æˆ¿é—´å·ï¼Œåˆ™è‡ªåŠ¨åŠ å…¥
   if ((ROOM_ID_FROM_URL && ROOM_ID) || (ROOM_ID && ROOM_ID !== 'default')) {
     connectWS();
   }
 
-  // no external control buttons ¡ª use canvas/touch/keyboard inputs
+  // no external control buttons â€” use canvas/touch/keyboard inputs
   setupCanvasInput();
   updateRoomPanels();
 });
 
-// ¼üÅÌ¿ì½İ¼ü£ºµ¥»÷×¼±¸ a/j£¬È¡Ïû d£¬´ò¶Ï k
+// é”®ç›˜å¿«æ·é”®ï¼šå•å‡»å‡†å¤‡ a/jï¼Œå–æ¶ˆ dï¼Œæ‰“æ–­ k
 window.addEventListener('keydown', (e) => {
   if (e.repeat) return;
   const now = performance.now() / 1000;
@@ -1338,14 +1338,14 @@ window.addEventListener('keydown', (e) => {
   // }
 });
 
-// ÆÁÄ»ÈÎÒâµã»÷Ò²ÄÜ½øÈë×¼±¸£¨µ«ºöÂÔ°´Å¥/ÊäÈëÉÏµÄµã»÷£»²¢±ÜÃâÓë³¤°´³åÍ»£©
+// å±å¹•ä»»æ„ç‚¹å‡»ä¹Ÿèƒ½è¿›å…¥å‡†å¤‡ï¼ˆä½†å¿½ç•¥æŒ‰é’®/è¾“å…¥ä¸Šçš„ç‚¹å‡»ï¼›å¹¶é¿å…ä¸é•¿æŒ‰å†²çªï¼‰
 let lastGlobalReadyTime = 0;
 function tryGlobalReady(e, isTouch = false) {
   const now = performance.now() / 1000;
   if (now < suppressGlobalInputUntil) return;
   if (e && isUiControlTarget(e.target)) return;
-  if (now - recentLongPress < 0.6) return; // ºöÂÔ½ô½Ó×ÅµÄ click£¨À´×Ô³¤°´£©
-  if (now - lastGlobalReadyTime < 0.6) return; // ·ÀÖ¹ touchend + click Ë«´¥·¢
+  if (now - recentLongPress < 0.6) return; // å¿½ç•¥ç´§æ¥ç€çš„ clickï¼ˆæ¥è‡ªé•¿æŒ‰ï¼‰
+  if (now - lastGlobalReadyTime < 0.6) return; // é˜²æ­¢ touchend + click åŒè§¦å‘
 
   if (![SystemState.IDLE, SystemState.AWIN, SystemState.BWIN].includes(systemState)) return;
 
@@ -1364,7 +1364,7 @@ window.addEventListener('click', (e) => tryGlobalReady(e, false));
 window.addEventListener('touchend', (e) => tryGlobalReady(e, true), { passive: false });
 //#endregion
 
-//#region 9) »­²¼========
+//#region 9) ç”»å¸ƒ========
 function drawRoundedRect(x, y, w, h, radius) {
   ctx.beginPath();
   ctx.moveTo(x + radius, y);
@@ -1523,14 +1523,14 @@ function drawTexts() {
   ctx.fillText(message, WIDTH / 2, HEIGHT * 0.36 + uiShiftY);
   let subHint = '';
   if (wsConnected && wsRole && systemState === SystemState.IDLE) {
-    if (wsRole === 'S') subHint = '·¿¼äÒÑÂú£¬µ±Ç°ÎªÅÔ¹Û';
-    else if (roomHasA && roomHasB) subHint = 'ÈËÒÑ¼¯Æë£¬µã»÷ÆÁÄ»×¼±¸';
-    else subHint = 'µÈ´ıÍæ¼Ò½øÈë...';
+    if (wsRole === 'S') subHint = 'æˆ¿é—´å·²æ»¡ï¼Œå½“å‰ä¸ºæ—è§‚';
+    else if (roomHasA && roomHasB) subHint = 'äººå·²é›†é½ï¼Œç‚¹å‡»å±å¹•å‡†å¤‡';
+    else subHint = 'ç­‰å¾…ç©å®¶è¿›å…¥...';
   }
   if (wsConnected && (swapConfirmA || swapConfirmB)) {
-    const aMark = swapConfirmA ? '?' : '-';
-    const bMark = swapConfirmB ? '?' : '-';
-    subHint = `»»½ÇÈ·ÈÏ Æø´¿:${aMark} ½£´¿:${bMark}`;
+    const aMark = swapConfirmA ? 'âœ“' : '-';
+    const bMark = swapConfirmB ? 'âœ“' : '-';
+    subHint = `æ¢è§’ç¡®è®¤ æ°”çº¯:${aMark} å‰‘çº¯:${bMark}`;
   }
   if (subHint) {
     ctx.font = '12px "Microsoft YaHei", Arial';
@@ -1544,30 +1544,30 @@ function drawTexts() {
     : null;
   if (systemState === SystemState.AWIN) {
     if (interruptMsText !== null) {
-      text = `½£´¿${interruptMsText}ms£¨½£·ÉÊ±¼ä£©Ã»ÓĞ·Éµ½`;
+      text = `å‰‘çº¯${interruptMsText}msï¼ˆå‰‘é£æ—¶é—´ï¼‰æ²¡æœ‰é£åˆ°`;
     } else {
-      text = '¶ÁÍê¿©£¡';
+      text = 'è¯»å®Œå’¯ï¼';
     }
   } else if (systemState === SystemState.BWIN) {
     if (bWinReason === BWinReason.TIMEOUT) {
-      text = 'Æ­Ò²Ã»ÓÃ »¹²»ÊÇÒª³Ô½£³å';
+      text = 'éª—ä¹Ÿæ²¡ç”¨ è¿˜ä¸æ˜¯è¦åƒå‰‘å†²';
     } else {
-      text = interruptMsText !== null ? `½£·É³É¹¦Ê±¼ä ${interruptMsText}ms` : '½£·É³É¹¦';
+      text = interruptMsText !== null ? `å‰‘é£æˆåŠŸæ—¶é—´ ${interruptMsText}ms` : 'å‰‘é£æˆåŠŸ';
     }
   } else if (systemState === SystemState.PREPARE) {
     let remaining = 3;
     if (prepareStartTime !== null) {
       remaining = Math.max(0, 3 - (performance.now() / 1000 - prepareStartTime));
     }
-    text = `×¼±¸µ¹¼ÆÊ±£º${Math.ceil(remaining)}Ãë`;
+    text = `å‡†å¤‡å€’è®¡æ—¶ï¼š${Math.ceil(remaining)}ç§’`;
   } else if (systemState === SystemState.RUNNING) {
     let remaining = roundTimeoutSeconds;
     if (roundStartTime !== null) {
       remaining = Math.max(0, roundTimeoutSeconds - (performance.now() / 1000 - roundStartTime));
     }
-    text = `ÉúÌ«¼«Ãâ¿Ø£º${remaining.toFixed(1)}`;
+    text = `ç”Ÿå¤ªæå…æ§ï¼š${remaining.toFixed(1)}`;
   } else {    
-    text = `ÓÎÏ·¿ªÊ¼£¡`;
+    text = `æ¸¸æˆå¼€å§‹ï¼`;
   }
 
   if (systemState === SystemState.PREPARE) {
@@ -1586,17 +1586,17 @@ function drawTexts() {
     ctx.fillText(text, WIDTH / 2, HEIGHT * 0.82 + uiShiftY);
   }
 
-  // A/B ready ×´Ì¬ÏÔÊ¾
+  // A/B ready çŠ¶æ€æ˜¾ç¤º
   ctx.font = '18px "Microsoft YaHei", Arial';
   ctx.fillStyle = '#9f9';
-  const aReadyMark = aReady ? '?' : '-';
-  const bReadyMark = bReady ? '?' : '-';
-  ctx.fillText(`Æø´¿ Ready: ${aReadyMark}    ½£´¿ Ready: ${bReadyMark}`, WIDTH / 2, HEIGHT * 0.88 + uiShiftY);
+  const aReadyMark = aReady ? 'âœ“' : '-';
+  const bReadyMark = bReady ? 'âœ“' : '-';
+  ctx.fillText(`æ°”çº¯ Ready: ${aReadyMark}    å‰‘çº¯ Ready: ${bReadyMark}`, WIDTH / 2, HEIGHT * 0.88 + uiShiftY);
 
   const aLosses = bWins;
   const bLosses = aWins;
   ctx.fillStyle = '#cfcfcf';
-  ctx.fillText(`Õ½¼¨  Æø´¿ ${aWins}Ê¤${aLosses}¸º    ½£´¿ ${bWins}Ê¤${bLosses}¸º`, WIDTH / 2, HEIGHT * 0.92 + uiShiftY);
+  ctx.fillText(`æˆ˜ç»©  æ°”çº¯ ${aWins}èƒœ${aLosses}è´Ÿ    å‰‘çº¯ ${bWins}èƒœ${bLosses}è´Ÿ`, WIDTH / 2, HEIGHT * 0.92 + uiShiftY);
 
   // ctx.font = '12px "Microsoft YaHei", Arial';
   // ctx.fillStyle = '#8aa';
@@ -1645,5 +1645,6 @@ function gameLoop() {
 // Start rendering loop
 gameLoop();
 
-// Note: connectWS() is invoked when user clicks "¼ÓÈë" or when a room is provided via URL.
+// Note: connectWS() is invoked when user clicks "åŠ å…¥" or when a room is provided via URL.
+
 
