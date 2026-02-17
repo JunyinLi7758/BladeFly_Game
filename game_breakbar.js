@@ -532,7 +532,7 @@ function setupLeaderboardUI() {
   if (!batchTestBtn) {
     batchTestBtn = document.createElement('button');
     batchTestBtn.id = 'batchTestBtn';
-    batchTestBtn.textContent = '4次连续测试';
+    batchTestBtn.textContent = '4次连续测试(计入排行榜）';
     batchTestBtn.style.cssText = `
       position: fixed;
       top: 52px;
