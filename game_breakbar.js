@@ -164,6 +164,7 @@ let batchNextRoundAt = null;
 let batchResults = [];
 let batchSummary = null;
 let leaderboardEls = null;
+let saveInFlight = false;
 // #endregion
 
 
@@ -460,8 +461,15 @@ function closeLeaderboard() {
   leaderboardEls.overlay.setAttribute('aria-hidden', 'true');
 }
 
+function updateSaveButtonState() {
+  if (!leaderboardEls || !leaderboardEls.saveBtn) return;
+  leaderboardEls.saveBtn.disabled = saveInFlight;
+  leaderboardEls.saveBtn.textContent = saveInFlight ? '保存中...' : '保存记录';
+}
+
 async function saveBatchSummary() {
   if (!leaderboardEls) return;
+  if (saveInFlight) return;
   if (!batchSummary) {
     message = '请先完成4次连续测试。';
     return;
@@ -481,17 +489,25 @@ async function saveBatchSummary() {
     successCount: batchSummary.successCount
   };
 
-  const res = await fetch(BREAKBAR_API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-  if (!res.ok) {
-    throw new Error(`保存失败 (${res.status})`);
+  saveInFlight = true;
+  updateSaveButtonState();
+  try {
+    const res = await fetch(BREAKBAR_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      throw new Error(`保存失败 (${res.status})`);
+    }
+    const data = await res.json();
+    renderLeaderboard(Array.isArray(data.entries) ? data.entries : []);
+    message = '成绩已保存到排行榜。';
+    closeLeaderboard();
+  } finally {
+    saveInFlight = false;
+    updateSaveButtonState();
   }
-  const data = await res.json();
-  renderLeaderboard(Array.isArray(data.entries) ? data.entries : []);
-  message = '成绩已保存到排行榜。';
 }
 
 function setupLeaderboardUI() {
@@ -545,6 +561,7 @@ function setupLeaderboardUI() {
 
   updateCurrentSummaryLabel();
   updateBatchButtonState();
+  updateSaveButtonState();
 
   leaderboardBtn.addEventListener('click', () => {
     openLeaderboard();
@@ -556,6 +573,7 @@ function setupLeaderboardUI() {
     if (e.target === overlay) closeLeaderboard();
   });
   saveBtn.addEventListener('click', async () => {
+    if (saveInFlight) return;
     try {
       await saveBatchSummary();
     } catch (e) {
