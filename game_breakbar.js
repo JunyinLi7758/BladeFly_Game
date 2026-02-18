@@ -370,6 +370,8 @@ function startBatchTest() {
   const now = performance.now() / 1000;
   stopSound(currentBarSource);
   currentBarSource = null;
+  bladeflycdEndTime = null;
+  state = "IDLE";
   batchTestActive = true;
   batchNextRoundAt = null;
   batchResults = [];
@@ -418,6 +420,10 @@ function normalizeLeaderboardEntry(entry) {
 function renderLeaderboard(entries) {
   if (!leaderboardEls || !leaderboardEls.list) return;
   leaderboardEls.list.innerHTML = '';
+  leaderboardEls.list.style.maxHeight = '360px';
+  leaderboardEls.list.style.overflowY = 'auto';
+  leaderboardEls.list.style.overflowX = 'hidden';
+  leaderboardEls.list.style.paddingRight = '2px';
   if (!entries.length) {
     const empty = document.createElement('div');
     empty.className = 'leaderboard-item';
@@ -430,6 +436,7 @@ function renderLeaderboard(entries) {
   table.style.width = '100%';
   table.style.borderCollapse = 'collapse';
   table.style.fontSize = '13px';
+  table.style.tableLayout = 'fixed';
 
   const thead = document.createElement('thead');
   const headerRow = document.createElement('tr');
@@ -440,6 +447,10 @@ function renderLeaderboard(entries) {
     th.style.padding = '8px 6px';
     th.style.borderBottom = '1px solid rgba(255,255,255,0.2)';
     th.style.color = '#ddd';
+    th.style.position = 'sticky';
+    th.style.top = '0';
+    th.style.background = '#1f1f1f';
+    th.style.zIndex = '1';
     headerRow.appendChild(th);
   });
   thead.appendChild(headerRow);
