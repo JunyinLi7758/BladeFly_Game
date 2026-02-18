@@ -358,8 +358,8 @@ function updateCurrentSummaryLabel() {
 function updateBatchButtonState() {
   if (!leaderboardEls || !leaderboardEls.batchTestBtn) return;
   if (batchTestActive) {
-    leaderboardEls.batchTestBtn.disabled = true;
-    leaderboardEls.batchTestBtn.textContent = `测试中 ${batchResults.length}/${BATCH_TEST_ROUNDS}`;
+    leaderboardEls.batchTestBtn.disabled = false;
+    leaderboardEls.batchTestBtn.textContent = `测试中 ${batchResults.length}/${BATCH_TEST_ROUNDS}（点击重开）`;
   } else {
     leaderboardEls.batchTestBtn.disabled = false;
     leaderboardEls.batchTestBtn.textContent = '4次连续测试';
@@ -368,6 +368,8 @@ function updateBatchButtonState() {
 
 function startBatchTest() {
   const now = performance.now() / 1000;
+  stopSound(currentBarSource);
+  currentBarSource = null;
   batchTestActive = true;
   batchNextRoundAt = null;
   batchResults = [];
@@ -424,15 +426,47 @@ function renderLeaderboard(entries) {
     return;
   }
 
-  entries.forEach((rawEntry) => {
+  const table = document.createElement('table');
+  table.style.width = '100%';
+  table.style.borderCollapse = 'collapse';
+  table.style.fontSize = '13px';
+
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  ['名次', '用户名', '成功率', '平均成功时间'].forEach((title) => {
+    const th = document.createElement('th');
+    th.textContent = title;
+    th.style.textAlign = 'left';
+    th.style.padding = '8px 6px';
+    th.style.borderBottom = '1px solid rgba(255,255,255,0.2)';
+    th.style.color = '#ddd';
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  entries.forEach((rawEntry, idx) => {
     const entry = normalizeLeaderboardEntry(rawEntry);
     const rateText = `${(entry.successRate * 100).toFixed(1)}%`;
     const avgText = entry.avgSuccessMs === null ? '--' : `${entry.avgSuccessMs.toFixed(1)} ms`;
-    const item = document.createElement('div');
-    item.className = 'leaderboard-item';
-    item.textContent = `#${entry.rank} ${entry.name} | 成功率 ${rateText} | 平均成功时间 ${avgText}`;
-    leaderboardEls.list.appendChild(item);
+
+    const tr = document.createElement('tr');
+    if (idx % 2 === 1) {
+      tr.style.background = 'rgba(255,255,255,0.04)';
+    }
+    [String(entry.rank), entry.name, rateText, avgText].forEach((cellText) => {
+      const td = document.createElement('td');
+      td.textContent = cellText;
+      td.style.padding = '7px 6px';
+      td.style.borderBottom = '1px solid rgba(255,255,255,0.08)';
+      td.style.color = '#cfcfcf';
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
   });
+  table.appendChild(tbody);
+  leaderboardEls.list.appendChild(table);
 }
 
 async function fetchLeaderboard() {
@@ -581,7 +615,9 @@ function setupLeaderboardUI() {
     }
   });
   batchTestBtn.addEventListener('click', () => {
-    if (batchTestActive) return;
+    if (batchTestActive) {
+      message = '已重开4次连续测试。';
+    }
     startBatchTest();
   });
 }
