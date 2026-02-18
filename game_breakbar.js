@@ -172,34 +172,84 @@ let saveInFlight = false;
 // #region ========== 4) 输入事件（键盘/鼠标/触屏 + 职业按钮） ==========
 let touchStartTime = 0;
 const LONG_PRESS_TIME = 1000;
+const TOUCH_CLICK_SUPPRESS_MS = 500;
+const INPUT_DEBUG = (() => {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('debug_input') === '1';
+  } catch (e) {
+    return false;
+  }
+})();
+let lastTouchEndAtMs = 0;
+let audioReady = false;
+let audioUnlockPromise = null;
+
+function inputDebugLog(tag, detail = '') {
+  if (!INPUT_DEBUG) return;
+  const t = (performance.now() / 1000).toFixed(3);
+  const suffix = detail ? ` | ${detail}` : '';
+  console.log(`[input-debug ${t}] ${tag}${suffix}`);
+}
+
+function ensureAudioUnlockedNonBlocking(reason) {
+  if (audioReady) return;
+  if (!audioUnlockPromise) {
+    inputDebugLog('audio-unlock-start', reason || '');
+    audioUnlockPromise = Promise.resolve(unlockAudio())
+      .then(() => {
+        audioReady = true;
+        inputDebugLog('audio-unlock-ok');
+      })
+      .catch((err) => {
+        inputDebugLog('audio-unlock-fail', err && err.message ? err.message : String(err));
+      });
+  }
+}
 
 window.addEventListener('keydown', async (e) => {
   if (e.key === 'Escape') {
     state = "IDLE";
+    inputDebugLog('keydown-escape');
     return;
   }
   if (e.key === ' ' || e.key === 'Enter') {
     e.preventDefault();
-    await handleAction();
+    inputDebugLog('keydown-action', e.key);
+    ensureAudioUnlockedNonBlocking('keydown');
+    await handleAction('keydown');
   }
 });
 
 canvas.addEventListener('click', async () => {
-  await handleAction();
+  const nowMs = Date.now();
+  if (nowMs - lastTouchEndAtMs < TOUCH_CLICK_SUPPRESS_MS) {
+    inputDebugLog('click-suppressed', `delta=${nowMs - lastTouchEndAtMs}ms`);
+    return;
+  }
+  inputDebugLog('click-action');
+  ensureAudioUnlockedNonBlocking('click');
+  await handleAction('click');
 });
 
 canvas.addEventListener('touchstart', (e) => {
   e.preventDefault();
   touchStartTime = Date.now();
+  inputDebugLog('touchstart');
+  ensureAudioUnlockedNonBlocking('touchstart');
 });
 
 canvas.addEventListener('touchend', async (e) => {
   e.preventDefault();
-  const touchDuration = Date.now() - touchStartTime;
+  const endMs = Date.now();
+  const touchDuration = endMs - touchStartTime;
+  lastTouchEndAtMs = endMs;
+  inputDebugLog('touchend', `duration=${touchDuration}ms`);
   if (touchDuration > LONG_PRESS_TIME) {
     state = "IDLE";
+    inputDebugLog('touchend-longpress-reset');
   } else {
-    await handleAction();
+    await handleAction('touchend');
   }
 });
 
@@ -292,38 +342,44 @@ function AHandleBreak(now) {
   state = "RESULT";
 }
 
-async function handleAction() {
+async function handleAction(source = 'unknown') {
   const now = performance.now() / 1000;
+  inputDebugLog('handleAction-enter', `source=${source} state=${state}`);
 
-  // 首次交互解锁音频（移动端必需）
-  await unlockAudio();
+  // 音频解锁预热，不阻塞输入状态流。
+  ensureAudioUnlockedNonBlocking(`handleAction:${source}`);
 
   // CD 中：只提示
   if (bladeflycdEndTime !== null && now < bladeflycdEndTime) {
     const remain = (bladeflycdEndTime - now).toFixed(1);
     message = `别急，${currentJob.skillname}还在cd，剩余 ${remain} 秒。`;
+    inputDebugLog('handleAction-cd-block', `remain=${remain}s`);
     return;
   }
 
   // 已完成：开始新一轮
   if (state === "IDLE" || state === "RESULT" || state === "TOO_EARLY") {
     AStartPrepare(now);
+    inputDebugLog('handleAction-start-prepare');
     return;
   }
 
   // PREPARE：抢跑
   if (state === "PREPARE") {
     BStartTooEarly(now);
+    inputDebugLog('handleAction-too-early');
     return;
   }
 
   // RUNNING：成功打断
   if (state === "RUNNING") {
     AHandleBreak(now);
+    inputDebugLog('handleAction-break-success');
     return;
   }
 
   // SAFE RUNNING：无效点击（不做事）
+  inputDebugLog('handleAction-noop', `state=${state}`);
 }
 // #endregion
 
