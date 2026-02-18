@@ -440,10 +440,10 @@ function renderLeaderboard(entries) {
 
   const thead = document.createElement('thead');
   const headerRow = document.createElement('tr');
-  ['名次', '用户名', '成功率', '平均成功时间'].forEach((title) => {
+  ['名次', '用户名', '成功率', '平均成功时间'].forEach((title, colIdx) => {
     const th = document.createElement('th');
     th.textContent = title;
-    th.style.textAlign = 'left';
+    th.style.textAlign = 'center';
     th.style.padding = '8px 6px';
     th.style.borderBottom = '1px solid rgba(255,255,255,0.2)';
     th.style.color = '#ddd';
@@ -451,6 +451,10 @@ function renderLeaderboard(entries) {
     th.style.top = '0';
     th.style.background = '#1f1f1f';
     th.style.zIndex = '1';
+    if (colIdx === 0) {
+      th.style.width = '54px';
+      th.style.maxWidth = '54px';
+    }
     headerRow.appendChild(th);
   });
   thead.appendChild(headerRow);
@@ -466,12 +470,17 @@ function renderLeaderboard(entries) {
     if (idx % 2 === 1) {
       tr.style.background = 'rgba(255,255,255,0.04)';
     }
-    [String(entry.rank), entry.name, rateText, avgText].forEach((cellText) => {
+    [String(entry.rank), entry.name, rateText, avgText].forEach((cellText, colIdx) => {
       const td = document.createElement('td');
       td.textContent = cellText;
+      td.style.textAlign = 'center';
       td.style.padding = '7px 6px';
       td.style.borderBottom = '1px solid rgba(255,255,255,0.08)';
       td.style.color = '#cfcfcf';
+      if (colIdx === 0) {
+        td.style.width = '54px';
+        td.style.maxWidth = '54px';
+      }
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
