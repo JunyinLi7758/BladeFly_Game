@@ -170,8 +170,6 @@ let saveInFlight = false;
 
 
 // #region ========== 4) 输入事件（键盘/鼠标/触屏 + 职业按钮） ==========
-let touchStartTime = 0;
-const LONG_PRESS_TIME = 1000;
 
 window.addEventListener('keydown', async (e) => {
   if (e.key === 'Escape') {
@@ -188,20 +186,14 @@ canvas.addEventListener('click', async () => {
   await handleAction();
 });
 
-canvas.addEventListener('touchstart', (e) => {
+canvas.addEventListener('touchstart', async (e) => {
   e.preventDefault();
-  touchStartTime = Date.now();
-});
+  await handleAction();
+}, { passive: false });
 
-canvas.addEventListener('touchend', async (e) => {
+canvas.addEventListener('touchend', (e) => {
   e.preventDefault();
-  const touchDuration = Date.now() - touchStartTime;
-  if (touchDuration > LONG_PRESS_TIME) {
-    state = "IDLE";
-  } else {
-    await handleAction();
-  }
-});
+}, { passive: false });
 
 // 职业按钮绑定
 try {
