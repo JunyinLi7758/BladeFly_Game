@@ -165,6 +165,8 @@ let batchResults = [];
 let batchSummary = null;
 let leaderboardEls = null;
 let saveInFlight = false;
+let lastTouchTriggerAt = 0;
+const TOUCH_CLICK_GUARD_MS = 500;
 // #endregion
 
 
@@ -183,11 +185,13 @@ window.addEventListener('keydown', async (e) => {
 });
 
 canvas.addEventListener('click', async () => {
+  if (Date.now() - lastTouchTriggerAt < TOUCH_CLICK_GUARD_MS) return;
   await handleAction();
 });
 
 canvas.addEventListener('touchstart', async (e) => {
   e.preventDefault();
+  lastTouchTriggerAt = Date.now();
   await handleAction();
 }, { passive: false });
 
@@ -633,8 +637,6 @@ function setupLeaderboardUI() {
     startBatchTest();
   });
 }
-
-
 
 // #region ========== 6) 逻辑更新（SystemUpdate：推进状态机/读条/自断/超时/淡出） ==========
 function playSkillOnce() {

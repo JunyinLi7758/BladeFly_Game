@@ -261,6 +261,47 @@
   </div>
   </div>
 
+  <button id="donateBtn" style="position:fixed;right:14px;bottom:14px;z-index:50;background:rgba(0,0,0,0.72);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:10px 14px;cursor:pointer;">赞赏</button>
+  <div id="donateOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.62);display:none;align-items:center;justify-content:center;z-index:60;">
+    <div style="background:#1f1f1f;border-radius:12px;padding:16px;width:min(760px,92vw);color:#eee;">
+      <div style="font-size:18px;margin-bottom:12px;">若有好心侠士颇具财力，愿意打赏，感谢您的支持。祝侠士天天有奇遇！</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="margin-bottom:8px;color:#ccc;">支付宝</div>
+          <img src="img/Alipay_QR.jpg" alt="Alipay QR" style="width:min(320px,42vw);max-width:320px;border-radius:8px;" />
+        </div>
+        <div style="text-align:center;">
+          <div style="margin-bottom:8px;color:#ccc;">微信</div>
+          <img src="img/Wechat_QR.png" alt="Wechat QR" style="width:min(320px,42vw);max-width:320px;border-radius:8px;" />
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+        <button id="closeDonateBtn" style="background:#555;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const donateBtn = document.getElementById('donateBtn');
+      const overlay = document.getElementById('donateOverlay');
+      const closeBtn = document.getElementById('closeDonateBtn');
+      if (!donateBtn || !overlay || !closeBtn) return;
+
+      donateBtn.addEventListener('click', () => {
+        overlay.style.display = 'flex';
+      });
+      closeBtn.addEventListener('click', () => {
+        overlay.style.display = 'none';
+      });
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          overlay.style.display = 'none';
+        }
+      });
+    })();
+  </script>
+
 
 </body>
 </html>
